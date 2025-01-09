@@ -1,0 +1,15 @@
+{
+  "name": "wasm-editor",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "wasm_editor_bg.wasm",
+    "wasm_editor.js",
+    "wasm_editor.d.ts"
+  ],
+  "main": "wasm_editor.js",
+  "types": "wasm_editor.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

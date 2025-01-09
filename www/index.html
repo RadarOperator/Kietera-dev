@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WASM Editor</title>
+</head>
+<body>
+    <canvas id="editor" width="800" height="600" tabindex="0"></canvas>
+    <script type="module">
+        import init, { Editor } from '../pkg/wasm_editor.js';
+
+        async function start() {
+            await init();
+            const canvas = document.getElementById('editor');
+            const editor = new Editor(canvas);
+            
+            canvas.focus();
+            canvas.addEventListener('keydown', (e) => {
+                e.preventDefault();
+                editor.handle_key(e.key);
+            });
+        }
+
+        start();
+    </script>
+</body>
+</html>
