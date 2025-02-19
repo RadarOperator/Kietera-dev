@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Markdown Browser</title>
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: Georgia, serif;
+            line-height: 1.6;
+        }
+        input {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 20px;
+        }
+        #content {
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+        }
+        /* Simple but readable markdown styles */
+        h1, h2, h3 { margin-top: 1.5em; }
+        code { 
+            background: #f5f5f5;
+            padding: 2px 5px;
+        }
+        blockquote {
+            border-left: 3px solid #ccc;
+            margin: 0;
+            padding-left: 1em;
+        }
+    </style>
+</head>
+<body>
+    <input type="url" id="url" placeholder="Enter markdown URL or paste markdown text">
+    <div id="content"></div>
+
+    <script>
+        // Simple markdown parser
+        const parseMarkdown = (text) => {
+            let html = text
+                // Headers
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                // Links
+                .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
+                // Bold
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                // Code blocks
+                .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
+                // Inline code
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                // Blockquotes
+                .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
+                // Lists (basic)
+                .replace(/^\* (.+)/gm, '<ul><li>$1</li></ul>')
+                // Paragraphs
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/^\s*(.+)/gm, '$1');
+
+            return `<p>${html}</p>`;
+        };
+
+        // Handle input changes
+        const contentDiv = document.getElementById('content');
+        const urlInput = document.getElementById('url');
+
+        urlInput.addEventListener('input', async (e) => {
+            const input = e.target.value;
+            
+            // If it looks like a URL, fetch it
+            if (input.startsWith('http')) {
+                try {
+                    const response = await fetch(input);
+                    const text = await response.text();
+                    contentDiv.innerHTML = parseMarkdown(text);
+                } catch (error) {
+                    contentDiv.innerHTML = `<p>Error loading URL: ${error.message}</p>`;
+                }
+            } else {
+                // Otherwise treat it as direct markdown input
+                contentDiv.innerHTML = parseMarkdown(input);
+            }
+        });
+    </script>
+</body>
+</html>
