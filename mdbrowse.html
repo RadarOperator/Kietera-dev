@@ -40,6 +40,8 @@
             color: #666;
             font-family: Georgia, serif;
             font-variant: small-caps;
+            width: 80px; /* Fixed width */
+            text-align: center;
         }
         .source-indicator .active {
             font-weight: bold;
@@ -184,64 +186,68 @@
             }
         }
 
-        async function fetchContent(url, isNavigation = true) {
-            startLoading();
-            
-            let content = null;
-            
-            // Try direct URL if it ends with .md
-            if (url.endsWith('.md')) {
-                content = await tryFetch(url);
-            }
-            
-            // Try appending index.md
-            if (!content && !url.endsWith('.md')) {
-                const mdUrl = url.endsWith('/') ? url + 'index.md' : url + '/index.md';
-                content = await tryFetch(mdUrl);
-            }
-            
-            // Try r.jina.ai
-            if (!content) {
-                // Only try jina.ai if it's not an image URL
-                if (!url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
-                    const jinaUrl = 'https://r.jina.ai/' + (url.startsWith('http') ? url : '/' + url);
-                    content = await tryFetch(jinaUrl);
-                    if (content) updateSourceIndicator(false);
-                } else {
-                    window.location.href = url;
-                    return;
-                }
-            }
-            
-            stopLoading();
-            
-            if (content) {
-                if (isNavigation) {
-                    // Update history
-                    history.splice(currentIndex + 1);
-                    history.push(url);
-                    currentIndex++;
-                    backButton.classList.add('active');
-                }
-                contentDiv.innerHTML = parseMarkdown(content);
-                setupLinks();
-            } else {
-                contentDiv.innerHTML = `<p>Could not load content from ${url}</p>`;
-            }
+// Add source type to history entries
+async function fetchContent(url, isNavigation = true) {
+    startLoading();
+    
+    let content = null;
+    let isNative = false; // Track if content is native markdown
+    
+    // Try direct URL if it ends with .md
+    if (url.endsWith('.md')) {
+        content = await tryFetch(url);
+        if (content) isNative = true;
+    }
+    
+    // Try appending index.md
+    if (!content && !url.endsWith('.md')) {
+        const mdUrl = url.endsWith('/') ? url + 'index.md' : url + '/index.md';
+        content = await tryFetch(mdUrl);
+        if (content) isNative = true;
+    }
+    
+    // Try r.jina.ai
+    if (!content) {
+        if (!url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+            const jinaUrl = 'https://r.jina.ai/' + (url.startsWith('http') ? url : '/' + url);
+            content = await tryFetch(jinaUrl);
+        } else {
+            window.location.href = url;
+            return;
         }
-        
-        // Handle back button
-        backButton.addEventListener('click', () => {
-            if (currentIndex > 0) {
-                currentIndex--;
-                const previousUrl = history[currentIndex];
-                urlInput.value = previousUrl;
-                fetchContent(previousUrl, false);
-                if (currentIndex === 0) {
-                    backButton.classList.remove('active');
-                }
-            }
-        });
+    }
+    
+    stopLoading();
+    
+    if (content) {
+        if (isNavigation) {
+            // Store both URL and source type in history
+            history.splice(currentIndex + 1);
+            history.push({ url, isNative });
+            currentIndex++;
+            backButton.classList.add('active');
+        }
+        updateSourceIndicator(isNative);
+        contentDiv.innerHTML = parseMarkdown(content);
+        setupLinks();
+    } else {
+        contentDiv.innerHTML = `<p>Could not load content from ${url}</p>`;
+    }
+}
+
+// Update back button handler
+backButton.addEventListener('click', () => {
+    if (currentIndex > 0) {
+        currentIndex--;
+        const previousEntry = history[currentIndex];
+        urlInput.value = previousEntry.url;
+        fetchContent(previousEntry.url, false);
+        updateSourceIndicator(previousEntry.isNative);
+        if (currentIndex === 0) {
+            backButton.classList.remove('active');
+        }
+    }
+});
 
         // Theme cycling
         const themes = ['light', 'dark', 'sepia'];
