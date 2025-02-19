@@ -246,11 +246,6 @@
             document.querySelector('.markdown').classList.toggle('active', isNative);
             document.querySelector('.converted').classList.toggle('active', !isNative);
         }
-
-        // Theme cycling
-        const themes = ['light', 'dark', 'sepia'];
-        const themeSymbols = ['☼', '☾', '∗'];
-        let currentTheme = 0;
         
         document.querySelector('.mode-toggle').addEventListener('click', () => {
             currentTheme = (currentTheme + 1) % themes.length;
