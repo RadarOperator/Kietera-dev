@@ -40,13 +40,42 @@
     <script>
         // Simple markdown parser
         const parseMarkdown = (text) => {
-            let html = text
-                // Headers
+            // Extract content after "Markdown Content:"
+            const contentStart = text.indexOf("Markdown Content:");
+            const content = contentStart !== -1 ? text.slice(contentStart + 17) : text;
+            
+            // Split into lines for underline header processing
+            const lines = content.split('\n');
+            const processedLines = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const nextLine = lines[i + 1] || '';
+                
+                // Check for underline-style headers
+                if (nextLine.match(/^=+$/)) {
+                    processedLines.push('# ' + line);
+                    i++; // Skip the underline
+                } else if (nextLine.match(/^-+$/)) {
+                    processedLines.push('## ' + line);
+                    i++; // Skip the underline
+                } else {
+                    processedLines.push(line);
+                }
+            }
+            
+            let html = processedLines.join('\n')
+                // Headers (# style)
                 .replace(/^### (.*$)/gm, '<h3>$1</h3>')
                 .replace(/^## (.*$)/gm, '<h2>$1</h2>')
                 .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-                // Links
-                .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
+                // Links - prepend r.jina.ai for relative URLs
+                .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
+                    if (!url.startsWith('http')) {
+                        url = 'https://r.jina.ai' + url;
+                    }
+                    return `<a href="${url}">${text}</a>`;
+                })
                 // Bold
                 .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
                 // Italic
