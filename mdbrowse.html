@@ -136,7 +136,7 @@
             
             // Try r.jina.ai
             if (!content) {
-                const jinaUrl = 'https://r.jina.ai' + (url.startsWith('http') ? url : '/' + url);
+                const jinaUrl = 'https://r.jina.ai/' + (url.startsWith('http') ? url : '/' + url);
                 content = await tryFetch(jinaUrl);
             }
             
