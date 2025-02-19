@@ -10,20 +10,57 @@
             padding: 20px;
             font-family: Georgia, serif;
             line-height: 1.6;
-            padding-top: 80px;  /* Adjust based on nav-container height */
         }
         .nav-container {
-            position: fixed;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 20px;
-            max-width: 800px;
-            width: 100%;
-            box-sizing: border-box;
-            z-index: 100;
-            border-bottom: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        .mode-toggle {
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+            user-select: none;
+        }
+        .source-indicator {
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: #666;
+            font-family: Georgia, serif;
+            font-variant: small-caps;
+        }
+        .source-indicator .active {
+            font-weight: bold;
+            color: #333;
+        }
+        /* Theme styles */
+        body.light {
+            background: #fff;
+            color: #222;
+        }
+        body.dark {
+            background: #222;
+            color: #ddd;
+        }
+        body.sepia {
+            background: #f4ecd8;
+            color: #5b4636;
+        }
+        .dark input {
+            background: #333;
+            color: #ddd;
+            border-color: #444;
+        }
+        .dark .input-indicator,
+        .dark .mode-toggle,
+        .dark .back-button {
+            color: #888;
+        }
+        .sepia input {
+            background: #f4ecd8;
+            color: #5b4636;
+            border-color: #d3c4b0;
         }
         .back-button {
             color: #666;
@@ -80,6 +117,8 @@
             <input type="url" id="url" placeholder="Enter markdown URL">
             <span class="input-indicator">⏎</span>
         </div>
+        <span class="source-indicator"><span class="markdown">markdown</span> | <span class="converted">converted</span></span>
+        <span class="mode-toggle">☼</span>
     </div>
     <div id="content"></div>
 
@@ -144,8 +183,15 @@
             
             // Try r.jina.ai
             if (!content) {
-                const jinaUrl = 'https://r.jina.ai/' + (url.startsWith('http') ? url : '/' + url);
-                content = await tryFetch(jinaUrl);
+                // Only try jina.ai if it's not an image URL
+                if (!url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+                    const jinaUrl = 'https://r.jina.ai' + (url.startsWith('http') ? url : '/' + url);
+                    content = await tryFetch(jinaUrl);
+                    if (content) updateSourceIndicator(false);
+                } else {
+                    window.location.href = url;
+                    return;
+                }
             }
             
             stopLoading();
@@ -177,6 +223,23 @@
                 }
             }
         });
+
+        // Theme cycling
+        const themes = ['light', 'dark', 'sepia'];
+        const themeSymbols = ['☼', '☾', '∗'];
+        let currentTheme = 0;
+        
+        document.querySelector('.mode-toggle').addEventListener('click', () => {
+            currentTheme = (currentTheme + 1) % themes.length;
+            document.body.className = themes[currentTheme];
+            document.querySelector('.mode-toggle').textContent = themeSymbols[currentTheme];
+        });
+
+        // Update source indicator
+        function updateSourceIndicator(isNative) {
+            document.querySelector('.markdown').classList.toggle('active', isNative);
+            document.querySelector('.converted').classList.toggle('active', !isNative);
+        }
 
         // Handle URL input
         urlInput.addEventListener('keypress', (e) => {
