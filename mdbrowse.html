@@ -123,8 +123,6 @@
             <span class="converted">converted</span>
         </span>
         <span class="mode-toggle">☼</span>
-        <span class="source-indicator"><span class="markdown">markdown</span> | <span class="converted">converted</span></span>
-        <span class="mode-toggle">☼</span>
     </div>
     <div id="content"></div>
 
@@ -191,7 +189,7 @@
             if (!content) {
                 // Only try jina.ai if it's not an image URL
                 if (!url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
-                    const jinaUrl = 'https://r.jina.ai' + (url.startsWith('http') ? url : '/' + url);
+                    const jinaUrl = 'https://r.jina.ai/' + (url.startsWith('http') ? url : '/' + url);
                     content = await tryFetch(jinaUrl);
                     if (content) updateSourceIndicator(false);
                 } else {
