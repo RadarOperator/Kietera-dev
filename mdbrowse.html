@@ -117,6 +117,12 @@
             <input type="url" id="url" placeholder="Enter markdown URL">
             <span class="input-indicator">⏎</span>
         </div>
+        <span class="source-indicator">
+            <span class="native">native</span>
+            <span class="dot">·</span>
+            <span class="converted">converted</span>
+        </span>
+        <span class="mode-toggle">☼</span>
         <span class="source-indicator"><span class="markdown">markdown</span> | <span class="converted">converted</span></span>
         <span class="mode-toggle">☼</span>
     </div>
@@ -239,6 +245,26 @@
         function updateSourceIndicator(isNative) {
             document.querySelector('.markdown').classList.toggle('active', isNative);
             document.querySelector('.converted').classList.toggle('active', !isNative);
+        }
+
+        // Theme cycling
+        const themes = ['light', 'dark', 'sepia'];
+        const themeSymbols = ['☼', '☾', '∗'];
+        let currentTheme = 0;
+        
+        document.querySelector('.mode-toggle').addEventListener('click', () => {
+            currentTheme = (currentTheme + 1) % themes.length;
+            document.body.className = themes[currentTheme];
+            document.querySelector('.mode-toggle').textContent = themeSymbols[currentTheme];
+            localStorage.setItem('theme', currentTheme);
+        });
+
+        // Restore theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme !== null) {
+            currentTheme = parseInt(savedTheme);
+            document.body.className = themes[currentTheme];
+            document.querySelector('.mode-toggle').textContent = themeSymbols[currentTheme];
         }
 
         // Handle URL input
