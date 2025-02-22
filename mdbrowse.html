@@ -117,6 +117,9 @@
             color: #666;
             font-size: 20px;
             pointer-events: none;
+            display: inline-block;
+            /* No transition for hard flips */
+            transition: none;
         }
         .font-button {
             font-size: 18px;
@@ -148,15 +151,19 @@
         }
         .font-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 1fr;
             gap: 10px;
-            margin-bottom: 15px;
+        }
+        .font-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
         }
         .font-sample {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: auto;
             height: 30px;
             border: 1px solid #ccc;
             border-radius: 3px;
@@ -172,48 +179,29 @@
         .sepia .font-sample:hover {
             background: #ebe3d1;
         }
-        .size-slider-container {
+        .size-button {
             display: flex;
             align-items: center;
-            position: relative;
-            height: 100px;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
             margin-left: 10px;
+            font-weight: bold;
+            user-select: none;
         }
-        .size-slider {
-            -webkit-appearance: none;
-            appearance: none;
-            height: 80px;
-            width: 4px;
-            background: #ccc;
-            outline: none;
-        }
-        .size-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 8px;
-            background: #666;
-            cursor: pointer;
-            border-radius: 2px;
-        }
-        .size-slider::-moz-range-thumb {
-            width: 16px;
-            height: 8px;
-            background: #666;
-            cursor: pointer;
-            border-radius: 2px;
-        }
-        .slider-labels {
-            position: absolute;
-            left: 15px;
-            top: 0;
-            height: 100%;
+        .size-value {
             display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 30px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-left: 10px;
             font-size: 12px;
-            color: #666;
-            pointer-events: none;
         }
         #content {
             border-top: 1px solid #ccc;
@@ -251,7 +239,7 @@
         .rtl .input-indicator {
             right: auto;
             left: 10px;
-            transform: translateY(-50%) scaleX(-1);
+            transform: translateY(-50%);
         }
         .rtl input {
             padding: 5px 10px 5px 30px;
@@ -264,7 +252,7 @@
         <span class="back-button">←</span>
         <div class="url-container">
             <input type="url" id="url" placeholder="Enter markdown URL">
-            <span class="input-indicator">⏎</span>
+            <span class="input-indicator">~</span>
         </div>
         <div class="source-indicator">
             <span class="native">native</span>
@@ -278,17 +266,26 @@
     
     <div class="font-panel">
         <div class="font-grid">
-            <div class="font-sample" style="font-family: Georgia, serif;">Ga</div>
-            <div class="font-sample" style="font-family: 'Times New Roman', Times, serif;">Ti</div>
-            <div class="font-sample" style="font-family: Arial, sans-serif;">Ar</div>
-            <div class="font-sample" style="font-family: Verdana, sans-serif;">Ve</div>
-        </div>
-        <div class="size-slider-container">
-            <input type="range" min="0.75" max="1.25" value="1" step="0.05" class="size-slider" id="font-size-slider" orient="vertical">
-            <div class="slider-labels">
-                <span>Large</span>
-                <span>Standard</span>
-                <span>Small</span>
+            <div class="font-row">
+                <div class="font-sample" style="font-family: Georgia, serif;">Ga</div>
+                <div class="size-button" id="font-size-increase">+</div>
+            </div>
+            <div class="font-row">
+                <div class="font-sample" style="font-family: 'Times New Roman', Times, serif;">Ti</div>
+                <div class="size-value" id="font-size-value">100%</div>
+            </div>
+            <div class="font-row">
+                <div class="font-sample" style="font-family: Arial, sans-serif;">Ar</div>
+                <div class="size-button" id="font-size-decrease">-</div>
+            </div>
+            <div class="font-row">
+                <div class="font-sample" style="font-family: 'Courier New', monospace;">Co</div>
+            </div>
+            <div class="font-row">
+                <div class="font-sample" style="font-family: Palatino, 'Palatino Linotype', serif;">Pa</div>
+            </div>
+            <div class="font-row">
+                <div class="font-sample" style="font-family: Verdana, sans-serif;">Ve</div>
             </div>
         </div>
     </div>
@@ -300,8 +297,13 @@
         const indicator = document.querySelector('.input-indicator');
         const fontButton = document.querySelector('.font-button');
         const fontPanel = document.querySelector('.font-panel');
-        const fontSizeSlider = document.getElementById('font-size-slider');
         const fontSamples = document.querySelectorAll('.font-sample');
+        const fontSizeValue = document.getElementById('font-size-value');
+        const fontSizeIncrease = document.getElementById('font-size-increase');
+        const fontSizeDecrease = document.getElementById('font-size-decrease');
+        
+        // Initialize font size
+        let currentFontSize = 100;
         
         // Font panel toggle
         fontButton.addEventListener('click', () => {
@@ -328,10 +330,23 @@
             sample.setAttribute('data-font', sample.style.fontFamily);
         });
         
-        // Font size slider
-        fontSizeSlider.addEventListener('input', (e) => {
-            document.body.style.fontSize = e.target.value + 'em';
+        // Font size buttons
+        fontSizeIncrease.addEventListener('click', () => {
+            currentFontSize += 10;
+            updateFontSize();
         });
+        
+        fontSizeDecrease.addEventListener('click', () => {
+            if (currentFontSize > 50) {
+                currentFontSize -= 10;
+                updateFontSize();
+            }
+        });
+        
+        function updateFontSize() {
+            document.body.style.fontSize = (currentFontSize / 100) + 'em';
+            fontSizeValue.textContent = currentFontSize + '%';
+        }
         
         // Direction toggle (Ctrl+Shift+D)
         document.addEventListener('keydown', (e) => {
@@ -340,28 +355,31 @@
             }
         });
         
+        // Hard flip tilde animation
+        let tildeFlipped = false;
+        let tildeAnimationInterval = null;
+        
+        function startTildeAnimation() {
+            tildeAnimationInterval = setInterval(() => {
+                tildeFlipped = !tildeFlipped;
+                if (tildeFlipped) {
+                    indicator.style.transform = 'translateY(-50%) scaleX(-1)';
+                } else {
+                    indicator.style.transform = 'translateY(-50%) scaleX(1)';
+                }
+            }, 400);
+        }
+        
+        function stopTildeAnimation() {
+            clearInterval(tildeAnimationInterval);
+            indicator.style.transform = 'translateY(-50%) scaleX(1)';
+            indicator.textContent = '~';
+        }
+        
         // History management
         const history = [];
         let currentIndex = -1;
         
-        // Loading animation frames
-        const loadingFrames = ['○', '⊙', '⊚'];
-        let loadingInterval;
-        let frameIndex = 0;
-        
-        function startLoading() {
-            frameIndex = 0;
-            loadingInterval = setInterval(() => {
-                indicator.textContent = loadingFrames[frameIndex];
-                frameIndex = (frameIndex + 1) % loadingFrames.length;
-            }, 400);
-        }
-        
-        function stopLoading() {
-            clearInterval(loadingInterval);
-            indicator.textContent = '⏎';
-        }
-
         async function tryFetch(url) {
             try {
                 console.log('Trying to fetch:', url);
@@ -385,7 +403,8 @@
         }
 
         async function fetchContent(url, isNavigation = true) {
-            startLoading();
+            indicator.textContent = '~'; // Ensure we start with the tilde character
+            startTildeAnimation();
             
             let content = null;
             let isNative = false;
@@ -414,7 +433,7 @@
                 }
             }
             
-            stopLoading();
+            stopTildeAnimation();
             
             if (content) {
                 if (isNavigation) {
