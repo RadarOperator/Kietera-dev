@@ -28,6 +28,61 @@
             gap: 10px;
             border-bottom: 1px solid #ccc;
         }
+        .mode-toggle {
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+            user-select: none;
+        }
+        .source-indicator {
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: #666;
+            font-family: Georgia, serif;
+            font-variant: small-caps;
+            width: 80px; /* Fixed width */
+            text-align: center;
+        }
+        .source-indicator .active {
+            font-weight: bold;
+            color: #333;
+        }
+        /* Theme styles */
+        body.light {
+            background: #fff;
+            color: #222;
+        }
+        body.dark {
+            background: #222;
+            color: #ddd;
+        }
+        body.sepia {
+            background: #f4ecd8;
+            color: #5b4636;
+        }
+        .dark input {
+            background: #333;
+            color: #ddd;
+            border-color: #444;
+        }
+        .dark .input-indicator,
+        .dark .mode-toggle,
+        .dark .back-button {
+            color: #888;
+        }
+        .sepia input {
+            background: #f4ecd8;
+            color: #5b4636;
+            border-color: #d3c4b0;
+        }
+        .dark .nav-container {
+            background: #222;
+            border-color: #444;
+        }
+        .sepia .nav-container {
+            background: #f4ecd8;
+            border-color: #d3c4b0;
+        }
         .back-button {
             color: #666;
             font-size: 24px;
@@ -41,7 +96,8 @@
         }
         .url-container {
             position: relative;
-            flex-grow: 1;
+            flex: 1;
+            min-width: 0; /* Prevents flex item from overflowing */
             display: flex;
             align-items: center;
         }
@@ -59,55 +115,6 @@
             transform: translateY(-50%);
             color: #666;
             font-size: 20px;
-            pointer-events: none;
-        }
-        .dir-toggle {
-            position: absolute;
-            right: 40px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #666;
-            font-size: 16px;
-            cursor: pointer;
-            user-select: none;
-        }
-        .font-sample-container {
-            display: flex;
-            align-items: center;
-            margin-left: 10px;
-            gap: 5px;
-        }
-        .font-sample {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            font-family: Georgia, serif;
-            overflow: hidden;
-        }
-        .size-slider-container {
-            position: relative;
-            width: 120px;
-            height: 30px;
-        }
-        .size-slider {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 100%;
-            margin: 0;
-        }
-        .slider-labels {
-            display: flex;
-            justify-content: space-between;
-            font-size: 10px;
-            color: #666;
-            position: absolute;
-            width: 100%;
-            bottom: 0;
             pointer-events: none;
         }
         #content {
@@ -138,54 +145,85 @@
         a:visited {
             color: #666;
         }
-        /* RTL support */
-        .rtl {
-            direction: rtl;
-            text-align: right;
+        /* Font sample and controls */
+        .font-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-left: 10px;
+            width: 90px;
+            position: relative;
         }
-        .rtl .input-indicator {
-            right: auto;
-            left: 10px;
+        .font-sample {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-bottom: 5px;
         }
-        .rtl .dir-toggle {
-            right: auto;
-            left: 40px;
-        }
-        /* Theme styles */
-        body.light {
-            background: #fff;
-            color: #222;
-        }
-        body.dark {
-            background: #222;
-            color: #ddd;
-        }
-        body.sepia {
-            background: #f4ecd8;
-            color: #5b4636;
-        }
-        .dark input, .dark .font-sample {
+        .dark .font-sample {
             background: #333;
             color: #ddd;
             border-color: #444;
         }
-        .dark .input-indicator,
-        .dark .dir-toggle,
-        .dark .back-button {
-            color: #888;
-        }
-        .sepia input, .sepia .font-sample {
+        .sepia .font-sample {
             background: #f4ecd8;
             color: #5b4636;
             border-color: #d3c4b0;
         }
-        .dark .nav-container {
-            background: #222;
-            border-color: #444;
+        .size-slider-container {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
         }
-        .sepia .nav-container {
-            background: #f4ecd8;
-            border-color: #d3c4b0;
+        .size-slider {
+            appearance: none;
+            width: 80px;
+            height: 2px;
+            background: #ccc;
+            outline: none;
+            transform: rotate(-90deg);
+        }
+        .size-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 10px;
+            height: 20px;
+            background: #666;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        .size-slider::-moz-range-thumb {
+            width: 10px;
+            height: 20px;
+            background: #666;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        .slider-labels {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 80px;
+            right: 0;
+            font-size: 11px;
+            color: #666;
+            text-align: right;
+            padding-right: 5px;
+            pointer-events: none;
+        }
+        /* RTL support */
+        body.rtl {
+            direction: rtl;
+        }
+        .rtl .input-indicator {
+            right: auto;
+            left: 10px;
         }
     </style>
 </head>
@@ -194,20 +232,25 @@
         <span class="back-button">←</span>
         <div class="url-container">
             <input type="url" id="url" placeholder="Enter markdown URL">
-            <span class="dir-toggle">~</span>
             <span class="input-indicator">⏎</span>
         </div>
-        <div class="font-sample-container">
+        <div class="source-indicator">
+            <span class="native">native</span>
+            <span class="dot">·</span>
+            <span class="converted">converted</span>
+        </div>
+        <div class="font-controls">
             <div class="font-sample">Ga</div>
             <div class="size-slider-container">
-                <input type="range" min="0.5" max="1.5" step="0.1" value="1" class="size-slider" id="font-size-slider">
+                <input type="range" min="0.75" max="1.25" step="0.05" value="1" class="size-slider" id="font-size-slider">
                 <div class="slider-labels">
-                    <span>S</span>
-                    <span>M</span>
-                    <span>L</span>
+                    <span>Large</span>
+                    <span>Standard</span>
+                    <span>Small</span>
                 </div>
             </div>
         </div>
+        <span class="mode-toggle">☼</span>
     </div>
     <div id="content"></div>
 
@@ -216,34 +259,32 @@
         const contentDiv = document.getElementById('content');
         const backButton = document.querySelector('.back-button');
         const indicator = document.querySelector('.input-indicator');
-        const dirToggle = document.querySelector('.dir-toggle');
-        const fontSample = document.querySelector('.font-sample');
         const fontSizeSlider = document.getElementById('font-size-slider');
+        const fontSample = document.querySelector('.font-sample');
         
-        // Set initial font size to match slider middle position
-        document.body.style.fontSize = '1em';
-        fontSample.style.fontSize = '1em';
-        
-        // Direction toggle
+        // Direction handling
         let isRTL = false;
-        dirToggle.addEventListener('click', () => {
-            isRTL = !isRTL;
-            if (isRTL) {
-                document.body.classList.add('rtl');
-                dirToggle.textContent = '~'; // Same symbol but in RTL context
-                dirToggle.style.transform = 'translateY(-50%) scaleX(-1)'; // Flip horizontally
-            } else {
-                document.body.classList.remove('rtl');
-                dirToggle.textContent = '~';
-                dirToggle.style.transform = 'translateY(-50%)';
+        document.addEventListener('keydown', (e) => {
+            // Check for Ctrl+Shift+D for direction toggle
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                isRTL = !isRTL;
+                if (isRTL) {
+                    document.body.classList.add('rtl');
+                    // Hard swap the tilde (flip it horizontally)
+                    indicator.style.transform = 'translateY(-50%) scaleX(-1)';
+                } else {
+                    document.body.classList.remove('rtl');
+                    // Reset transformation
+                    indicator.style.transform = 'translateY(-50%)';
+                }
             }
         });
         
         // Font size slider
         fontSizeSlider.addEventListener('input', (e) => {
-            const size = e.target.value + 'em';
-            document.body.style.fontSize = size;
-            fontSample.style.fontSize = size;
+            const size = e.target.value;
+            document.body.style.fontSize = size + 'em';
+            fontSample.style.fontSize = size + 'em';
         });
         
         // History management
@@ -251,7 +292,7 @@
         let currentIndex = -1;
         
         // Loading animation frames
-        const loadingFrames = ['⋮', '⋰', '⋯', '⋱'];
+        const loadingFrames = ['○', '⊙', '⊚'];
         let loadingInterval;
         let frameIndex = 0;
         
@@ -260,7 +301,7 @@
             loadingInterval = setInterval(() => {
                 indicator.textContent = loadingFrames[frameIndex];
                 frameIndex = (frameIndex + 1) % loadingFrames.length;
-            }, 250);
+            }, 400);
         }
         
         function stopLoading() {
@@ -287,54 +328,90 @@
             startLoading();
             
             let content = null;
+            let isNative = false;
             
             // Try direct URL if it ends with .md
             if (url.endsWith('.md')) {
                 content = await tryFetch(url);
+                if (content) isNative = true;
             }
             
             // Try appending index.md
             if (!content && !url.endsWith('.md')) {
                 const mdUrl = url.endsWith('/') ? url + 'index.md' : url + '/index.md';
                 content = await tryFetch(mdUrl);
+                if (content) isNative = true;
             }
             
             // Try r.jina.ai
             if (!content) {
-                const jinaUrl = 'https://r.jina.ai' + (url.startsWith('http') ? url : '/' + url);
-                content = await tryFetch(jinaUrl);
+                if (!url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+                    const jinaUrl = 'https://r.jina.ai/' + (url.startsWith('http') ? url : '/' + url);
+                    content = await tryFetch(jinaUrl);
+                } else {
+                    window.location.href = url;
+                    return;
+                }
             }
             
             stopLoading();
             
             if (content) {
                 if (isNavigation) {
-                    // Update history
+                    // Store both URL and source type in history
                     history.splice(currentIndex + 1);
-                    history.push(url);
+                    history.push({ url, isNative });
                     currentIndex++;
                     backButton.classList.add('active');
                 }
+                updateSourceIndicator(isNative);
                 contentDiv.innerHTML = parseMarkdown(content);
                 setupLinks();
             } else {
                 contentDiv.innerHTML = `<p>Could not load content from ${url}</p>`;
             }
         }
-        
-        // Handle back button
+
+        // Update back button handler
         backButton.addEventListener('click', () => {
             if (currentIndex > 0) {
                 currentIndex--;
-                const previousUrl = history[currentIndex];
-                urlInput.value = previousUrl;
-                fetchContent(previousUrl, false);
+                const previousEntry = history[currentIndex];
+                urlInput.value = previousEntry.url;
+                fetchContent(previousEntry.url, false);
+                updateSourceIndicator(previousEntry.isNative);
                 if (currentIndex === 0) {
                     backButton.classList.remove('active');
                 }
             }
         });
 
+        // Update source indicator
+        function updateSourceIndicator(isNative) {
+            document.querySelector('.native').classList.toggle('active', isNative);
+            document.querySelector('.converted').classList.toggle('active', !isNative);
+        }
+
+        // Theme cycling
+        const themes = ['light', 'dark', 'sepia'];
+        const themeSymbols = ['☼', '☾', '∗'];
+        let currentTheme = 0;
+        
+        document.querySelector('.mode-toggle').addEventListener('click', () => {
+            currentTheme = (currentTheme + 1) % themes.length;
+            document.body.className = themes[currentTheme];
+            document.querySelector('.mode-toggle').textContent = themeSymbols[currentTheme];
+            localStorage.setItem('theme', currentTheme);
+        });
+
+        // Restore theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme !== null) {
+            currentTheme = parseInt(savedTheme);
+            document.body.className = themes[currentTheme];
+            document.querySelector('.mode-toggle').textContent = themeSymbols[currentTheme];
+        }
+        
         // Handle URL input
         urlInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -354,34 +431,6 @@
                     fetchContent(url);
                 });
             });
-        }
-
-        // Theme cycling
-        const themeToggle = document.createElement('span');
-        themeToggle.textContent = '☼';
-        themeToggle.style.cursor = 'pointer';
-        themeToggle.style.marginLeft = '10px';
-        themeToggle.style.fontSize = '20px';
-        themeToggle.style.color = '#666';
-        document.querySelector('.font-sample-container').appendChild(themeToggle);
-        
-        const themes = ['light', 'dark', 'sepia'];
-        const themeSymbols = ['☼', '☾', '∗'];
-        let currentTheme = 0;
-        
-        themeToggle.addEventListener('click', () => {
-            currentTheme = (currentTheme + 1) % themes.length;
-            document.body.className = themes[currentTheme];
-            themeToggle.textContent = themeSymbols[currentTheme];
-            localStorage.setItem('theme', currentTheme);
-        });
-        
-        // Restore theme
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme !== null) {
-            currentTheme = parseInt(savedTheme);
-            document.body.className = themes[currentTheme];
-            themeToggle.textContent = themeSymbols[currentTheme];
         }
 
         // Markdown parser
