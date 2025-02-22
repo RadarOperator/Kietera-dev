@@ -245,6 +245,19 @@
             padding: 5px 10px 5px 30px;
             text-align: right;
         }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 0.5px solid #e0e0e0;
+        }
+        thead th {
+            border-bottom: 0.5px solid #999;
+        }
     </style>
 </head>
 <body>
@@ -645,94 +658,115 @@ if (this.listStack && this.listStack.length > 0) {
 }
 
 // Table parsing
-let inTable = false;
 let tableHTML = '';
-let tableRows = [];
-let headerRow = null;
-let separatorRow = null;
+const lines = processedLines.slice();
+let i = 0;
 
-const tableRowRegex = /^\|(.+)\|$/;
-const tableSeparatorRegex = /^\|([\s-]+\|)+$/;
-
-// First pass - identify and collect table rows
-for (let i = 0; i < processedLines.length; i++) {
-    const line = processedLines[i].trim();
+while (i < lines.length) {
+    const line = lines[i].trim();
+    const nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : '';
     
-    if (tableRowRegex.test(line)) {
-        if (!inTable) {
-            // Start of a new table
-            inTable = true;
-            tableRows = [line];
-            
-            // Check if next line is a separator
-            if (i + 1 < processedLines.length && tableSeparatorRegex.test(processedLines[i + 1].trim())) {
-                separatorRow = processedLines[i + 1].trim();
-                headerRow = line;
-                i++; // Skip the separator row in the main loop
+    // Check if this is the start of a table (first row followed by a separator row)
+    if (line.startsWith('|') && line.endsWith('|') && 
+        nextLine.startsWith('|') && nextLine.endsWith('|') && 
+        nextLine.replace(/[^-|]/g, '') === nextLine) {
+        
+        // We found a table with a header
+        const tableLines = [];
+        const headerRow = line;
+        const separatorRow = nextLine;
+        
+        // Add the header row
+        tableLines.push(headerRow);
+        
+        // Skip the separator line since we've already identified it
+        i += 2;
+        
+        // Collect all subsequent table rows
+        while (i < lines.length) {
+            const rowLine = lines[i].trim();
+            if (rowLine.startsWith('|') && rowLine.endsWith('|') && 
+                rowLine !== separatorRow) {
+                tableLines.push(rowLine);
+                lines[i] = ''; // Clear the line to mark it as processed
+                i++;
+            } else {
+                break;
             }
-        } else {
-            // Continue existing table
-            tableRows.push(line);
-        }
-    } else if (inTable) {
-        // End of table reached
-        html = html.replace(tableRows[0], parseTableToHTML(tableRows, headerRow, separatorRow));
-        for (let j = 1; j < tableRows.length; j++) {
-            html = html.replace(tableRows[j], '');
         }
         
-        // Reset table state
-        inTable = false;
-        tableRows = [];
-        headerRow = null;
-        separatorRow = null;
+        // Convert the table lines to HTML
+        const tableHTML = parseTableToHTML(tableLines, headerRow, separatorRow);
+        
+        // Replace the header line with the table HTML
+        lines[tableLines.indexOf(headerRow)] = tableHTML;
+        
+        // Skip the line we just processed
+        continue;
     }
+    i++;
 }
 
-// Handle case where table is at the end of the content
-if (inTable) {
-    html = html.replace(tableRows[0], parseTableToHTML(tableRows, headerRow, separatorRow));
-    for (let j = 1; j < tableRows.length; j++) {
-        html = html.replace(tableRows[j], '');
-    }
-}
+// Join the processed lines back together
+html = lines.join('\n');
 
 // Function to parse table rows into HTML
 function parseTableToHTML(rows, headerRow, separatorRow) {
     let tableHTML = '<table>';
     
-    // Process each row
-    rows.forEach((row, index) => {
-        // Skip if this is the separator row
-        if (row === separatorRow) return;
+    // Process the header row
+    if (rows[0] === headerRow) {
+        const headerCells = headerRow
+            .split('|')
+            .slice(1, -1) // Remove first and last empty parts
+            .map(cell => cell.trim());
         
-        // Parse cells in this row
+        tableHTML += '<thead><tr>';
+        headerCells.forEach(cell => {
+            // Parse any markdown inside the table cell (e.g., links, bold)
+            tableHTML += `<th>${parseCellContent(cell)}</th>`;
+        });
+        tableHTML += '</tr></thead><tbody>';
+    }
+    
+    // Process content rows (skip header and separator)
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (row === headerRow || row === separatorRow) continue;
+        
         const cells = row
             .split('|')
             .slice(1, -1) // Remove first and last empty parts
             .map(cell => cell.trim());
         
-        if (row === headerRow) {
-            // This is the header row
-            tableHTML += '<thead><tr>';
-            cells.forEach(cell => {
-                tableHTML += `<th>${cell}</th>`;
-            });
-            tableHTML += '</tr></thead><tbody>';
-        } else {
-            // This is a content row
-            tableHTML += '<tr>';
-            cells.forEach(cell => {
-                tableHTML += `<td>${cell}</td>`;
-            });
-            tableHTML += '</tr>';
-        }
-    });
+        tableHTML += '<tr>';
+        cells.forEach(cell => {
+            // Parse any markdown inside the table cell
+            tableHTML += `<td>${parseCellContent(cell)}</td>`;
+        });
+        tableHTML += '</tr>';
+    }
     
     tableHTML += '</tbody></table>';
     return tableHTML;
 }
-            
+
+// Function to parse the markdown content inside table cells
+function parseCellContent(content) {
+    return content
+        // Links in Markdown reference style [text][id]
+        .replace(/\[([^\]]+)\]\[([^\]]+)\]/g, (match, text, id) => {
+            return `<a href="#" data-ref="${id}">${text}</a>`;
+        })
+        // Standard markdown links [text](url)
+        .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
+        // Bold
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        // Inline code
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
 return `<p>${html}</p>`;
         };
     </script>
