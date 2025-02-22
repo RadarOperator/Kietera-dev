@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Markdown Browser</title>
+    <title>Markdown Browser v25</title>
     <style>
         body {
             max-width: 800px;
@@ -539,11 +539,10 @@ const parseMarkdown = (text) => {
     const contentStart = text.indexOf("Markdown Content:");
     const content = contentStart !== -1 ? text.slice(contentStart + 17) : text;
     
-    // Split into lines for underline header processing and other block-level elements
+    // Split into lines for underline header processing
     const lines = content.split('\n');
     const processedLines = [];
     
-    // First pass: Process tables and other block elements
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const nextLine = lines[i + 1] || '';
@@ -555,51 +554,32 @@ const parseMarkdown = (text) => {
         } else if (nextLine.match(/^-+$/)) {
             processedLines.push('## ' + line);
             i++; // Skip the underline
-        } 
-        // Check for tables
-        else if (line.trim().startsWith('|') && line.trim().endsWith('|') && 
-                nextLine.trim().startsWith('|') && nextLine.trim().endsWith('|') && 
-                nextLine.replace(/[^-|:]/g, '') === nextLine.trim()) {
-            // We found a table
-            const tableLines = [];
-            tableLines.push(line.trim());   // Header row
-            tableLines.push(nextLine.trim()); // Separator row
-            i += 2; // Skip header and separator rows
-            
-            // Collect content rows
-            while (i < lines.length) {
-                const rowLine = lines[i].trim();
-                if (rowLine.startsWith('|') && rowLine.endsWith('|')) {
-                    tableLines.push(rowLine);
-                    i++;
-                } else {
-                    break;
-                }
-            }
-            i--; // Adjust for the main loop increment
-            
-            // Replace with table HTML
-            processedLines.push(parseTableToHTML(tableLines));
         } else {
             processedLines.push(line);
         }
     }
+
+    // Find and process tables first - using approach similar to marked
+    let text = processedLines.join('\n');
+    const tableParts = [];
     
-    // Second pass: Regular markdown processing
-    let html = processedLines.join('\n')
+    // Regular expression for table from marked.js
+    const tableRegex = /^ *([^|\n ].*\|.*)\n *\|?([ :]*[-:]+[ :]*\|[ :]*)+[-:]+[ :]*\n((?:.*\|.*(?:\n|$))*)\n*/gm;
+    
+    // Replace tables with placeholders so they don't get affected by other processing
+    text = text.replace(tableRegex, function(match, header, align, content) {
+        tableParts.push(renderTable(header, align, content));
+        return `{{TABLE_${tableParts.length - 1}_PLACEHOLDER}}`;
+    });
+
+    // Process other markdown elements
+    let html = text
         // Headers (# style)
         .replace(/^### (.*$)/gm, '<h3>$1</h3>')
         .replace(/^## (.*$)/gm, '<h2>$1</h2>')
         .replace(/^# (.*$)/gm, '<h1>$1</h1>')
         // Links
-        .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
-            // Handle relative URLs
-            if (!url.startsWith('http')) {
-                const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
-                url = url.startsWith('/') ? window.location.origin + url : baseUrl + url;
-            }
-            return `<a href="${url}">${text}</a>`;
-        })
+        .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
         // Bold
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         // Italic
@@ -610,124 +590,110 @@ const parseMarkdown = (text) => {
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         // Blockquotes
         .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
-        // Nested lists (unordered)
-        .replace(/^( *)[\*\+\-] (.*?)$/gm, function(match, indent, content) {
-            const indentLevel = indent.length;
-            return `<li data-indent="${indentLevel}">${content}</li>`;
+        // Lists
+        .replace(/^( *)[\*\+\-] (.+)/gm, function(match, indent, content) {
+            return indent + '<li>' + content + '</li>';
         })
-        // Nested lists (ordered)
-        .replace(/^( *)\d+\. (.*?)$/gm, function(match, indent, content) {
-            const indentLevel = indent.length;
-            return `<li data-indent="${indentLevel}" data-ordered="true">${content}</li>`;
+        .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+        // Ordered lists
+        .replace(/^( *)\d+\. (.+)/gm, function(match, indent, content) {
+            return indent + '<li>' + content + '</li>';
         })
-        // Process list items to create proper nested lists
-        .replace(/(<li[^>]*>.*?<\/li>)+/g, function(match) {
-            const items = match.match(/<li[^>]*>.*?<\/li>/g);
-            if (!items) return match;
-            
-            const processListItems = (items, startIndex, baseIndent) => {
-                let html = '';
-                let i = startIndex;
-                const isOrdered = items[i].includes('data-ordered="true"');
-                html += isOrdered ? '<ol>' : '<ul>';
-                
-                while (i < items.length) {
-                    const item = items[i];
-                    const indentMatch = item.match(/data-indent="(\d+)"/);
-                    const indent = indentMatch ? parseInt(indentMatch[1]) : 0;
-                    
-                    if (indent > baseIndent) {
-                        // Process nested list
-                        const [nestedHtml, nextIndex] = processListItems(items, i, indent);
-                        // Append nested list to previous item
-                        html = html.substring(0, html.lastIndexOf('</li>')) + nestedHtml + '</li>';
-                        i = nextIndex;
-                    } else if (indent === baseIndent) {
-                        // Current level item
-                        html += item;
-                        i++;
-                    } else {
-                        // Less indentation - end of this list
-                        break;
-                    }
-                }
-                
-                html += isOrdered ? '</ol>' : '</ul>';
-                return [html, i];
-            };
-            
-            const [html, _] = processListItems(items, 0, 0);
-            return html;
-        })
-        // Clean up list item attributes
-        .replace(/<li[^>]*data-indent="\d+"[^>]*>/g, '<li>')
-        .replace(/<li[^>]*data-ordered="true"[^>]*>/g, '<li>')
+        .replace(/(?<!<\/ul>\n)(<li>.*<\/li>\n?)+/g, '<ol>$&</ol>')
         // Paragraphs
         .replace(/\n\n/g, '</p><p>')
         .replace(/^\s*(.+)/gm, '$1');
 
-    // Parse table function
-    function parseTableToHTML(tableLines) {
-        const headerRow = tableLines[0];
-        const separatorRow = tableLines[1];
-        const contentRows = tableLines.slice(2);
-        
-        // Parse headers
-        const headers = headerRow
-            .split('|')
-            .filter((cell, index, array) => index > 0 && index < array.length - 1)
-            .map(cell => cell.trim());
-            
-        // Parse alignment from separator row
-        const alignments = separatorRow
-            .split('|')
-            .filter((cell, index, array) => index > 0 && index < array.length - 1)
-            .map(cell => {
-                cell = cell.trim();
-                if (cell.startsWith(':') && cell.endsWith(':')) {
-                    return 'center';
-                } else if (cell.endsWith(':')) {
-                    return 'right';
+    // Replace table placeholders with actual table HTML
+    html = html.replace(/{{TABLE_(\d+)_PLACEHOLDER}}/g, function(match, index) {
+        return tableParts[parseInt(index)];
+    });
+
+    // Function to render tables - highly based on marked's approach
+    function renderTable(header, align, content) {
+        // Split cells by pipe character
+        function splitCells(tableRow) {
+            // ensure that every cell-delimiting pipe has a space
+            // before it to distinguish it from an escaped pipe
+            const row = tableRow.replace(/\|/g, (match, offset, str) => {
+                let escaped = false;
+                let curr = offset;
+                while (--curr >= 0 && str[curr] === '\\') {
+                    escaped = !escaped;
                 }
-                return 'left';
+                if (escaped) {
+                    // odd number of slashes means | is escaped
+                    // so we leave it alone
+                    return '|';
+                } else {
+                    // add space before unescaped |
+                    return ' |';
+                }
             });
+            const cells = row.split(/ *\| */);
             
-        // Build HTML table
+            // First/last cell in a row cannot be empty if it has no leading/trailing pipe
+            if (!cells[0].trim()) {
+                cells.shift();
+            }
+            if (cells.length > 0 && !cells[cells.length - 1].trim()) {
+                cells.pop();
+            }
+            
+            return cells;
+        }
+
+        // Parse header row
+        const headerCells = splitCells(header.trim());
+        
+        // Parse alignment row
+        const alignRow = align.trim().split(/ *\| */);
+        if (!alignRow[0].trim()) {
+            alignRow.shift();
+        }
+        if (alignRow.length > 0 && !alignRow[alignRow.length - 1].trim()) {
+            alignRow.pop();
+        }
+        
+        // Determine alignment for each column
+        const alignments = alignRow.map(cell => {
+            if (cell.match(/^ *-+: *$/)) {
+                return 'right';
+            } else if (cell.match(/^ *:-+: *$/)) {
+                return 'center';
+            } else if (cell.match(/^ *:-+ *$/)) {
+                return 'left';
+            } else {
+                return '';
+            }
+        });
+        
+        // Start building the table HTML
         let tableHTML = '<table>\n<thead>\n<tr>\n';
         
         // Add header cells
-        headers.forEach((header, index) => {
-            const align = alignments[index] || '';
-            tableHTML += `<th${align ? ` align="${align}"` : ''}>${header}</th>\n`;
+        headerCells.forEach((cell, i) => {
+            const align = alignments[i] || '';
+            tableHTML += `<th${align ? ` align="${align}"` : ''}>${cell}</th>\n`;
         });
         
         tableHTML += '</tr>\n</thead>\n<tbody>\n';
         
-        // Add content rows
+        // Parse and add data rows
+        const contentRows = content.trim().split('\n');
         contentRows.forEach(row => {
-            const cells = row
-                .split('|')
-                .filter((cell, index, array) => index > 0 && index < array.length - 1)
-                .map(cell => cell.trim());
-                
+            const cells = splitCells(row);
             tableHTML += '<tr>\n';
             
-            cells.forEach((cell, index) => {
-                const align = alignments[index] || '';
-                // Process markdown inside cells
-                const cellContent = cell
-                    .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
-                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-                    .replace(/`([^`]+)`/g, '<code>$1</code>');
-                    
-                tableHTML += `<td${align ? ` align="${align}"` : ''}>${cellContent}</td>\n`;
+            cells.forEach((cell, i) => {
+                const align = alignments[i] || '';
+                tableHTML += `<td${align ? ` align="${align}"` : ''}>${cell}</td>\n`;
             });
             
             tableHTML += '</tr>\n';
         });
         
-        tableHTML += '</tbody>\n</table>';
+        tableHTML += '</tbody>\n</table>\n';
         return tableHTML;
     }
 
