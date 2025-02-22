@@ -533,182 +533,178 @@
             });
         }
 
-        // Markdown parser
-        const parseMarkdown = (text) => {
-            // Extract content after "Markdown Content:"
-            const contentStart = text.indexOf("Markdown Content:");
-            const content = contentStart !== -1 ? text.slice(contentStart + 17) : text;
+// Markdown parser
+const parseMarkdown = (text) => {
+    // Extract content after "Markdown Content:"
+    const contentStart = text.indexOf("Markdown Content:");
+    const content = contentStart !== -1 ? text.slice(contentStart + 17) : text;
+    
+    // Split into lines for underline header processing
+    const lines = content.split('\n');
+    const processedLines = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const nextLine = lines[i + 1] || '';
+        
+        // Check for underline-style headers
+        if (nextLine.match(/^=+$/)) {
+            processedLines.push('# ' + line);
+            i++; // Skip the underline
+        } else if (nextLine.match(/^-+$/)) {
+            processedLines.push('## ' + line);
+            i++; // Skip the underline
+        } else {
+            processedLines.push(line);
+        }
+    }
+    
+    // Table parsing - extract tables first
+    const tableExtractedLines = [];
+    let i = 0;
+    
+    while (i < processedLines.length) {
+        const line = processedLines[i].trim();
+        const nextLine = (i + 1 < processedLines.length) ? processedLines[i + 1].trim() : '';
+        
+        // Check if this is the start of a table (first row followed by a separator row)
+        if (line.startsWith('|') && line.endsWith('|') && 
+            nextLine.startsWith('|') && nextLine.endsWith('|') && 
+            nextLine.replace(/[^-|]/g, '') === nextLine) {
             
-            // Split into lines for underline header processing
-            const lines = content.split('\n');
-            const processedLines = [];
+            // We found a table with a header
+            const tableLines = [];
+            const headerRow = line;
+            const separatorRow = nextLine;
             
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const nextLine = lines[i + 1] || '';
-                
-                // Check for underline-style headers
-                if (nextLine.match(/^=+$/)) {
-                    processedLines.push('# ' + line);
-                    i++; // Skip the underline
-                } else if (nextLine.match(/^-+$/)) {
-                    processedLines.push('## ' + line);
-                    i++; // Skip the underline
+            // Add the header row
+            tableLines.push(headerRow);
+            
+            // Skip the separator line since we've already identified it
+            i += 2;
+            
+            // Collect all subsequent table rows
+            while (i < processedLines.length) {
+                const rowLine = processedLines[i].trim();
+                if (rowLine.startsWith('|') && rowLine.endsWith('|') && 
+                    rowLine !== separatorRow) {
+                    tableLines.push(rowLine);
+                    i++;
                 } else {
-                    processedLines.push(line);
+                    break;
                 }
-            }let html = processedLines.join('\n')
-    // Headers (# style)
-    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-    
-    // Line breaks - handle explicit line breaks (double space at end of line)
-    .replace(/(\S)  \n/g, '$1<br>\n')
-    
-    // Images with alt text and optional title
-    .replace(/!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g, function(match, alt, src, _, title) {
-        // Handle relative URLs by prepending the base URL
-        let fullSrc = src;
-        if (!src.startsWith('http')) {
-            // Extract base URL from current page URL
-            const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
-            fullSrc = src.startsWith('/') ? window.location.origin + src : baseUrl + src;
-        }
-        
-        return `<a href="${fullSrc}"><img src="${fullSrc}" alt="${alt}" ${title ? `title="${title}"` : ''}></a>`;
-    })
-    
-    // Links
-    .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
-        // Handle relative URLs
-        if (!url.startsWith('http')) {
-            const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
-            url = url.startsWith('/') ? window.location.origin + url : baseUrl + url;
-        }
-        return `<a href="${url}">${text}</a>`;
-    })
-    
-    // Process lists - this is more complex and should handle nesting
-    .replace(/^( *)(?:[*+-]|\d+\.) (.+)$/gm, function(match, indent, content) {
-        // Create an array to keep track of the current list state
-        if (typeof this.listStack === 'undefined') {
-            this.listStack = [];
-        }
-        
-        let indentLevel = indent.length;
-        let html = '';
-        
-        // Check if we're starting a new list
-        if (this.listStack.length === 0 || indentLevel > this.listStack[this.listStack.length - 1].indent) {
-            // It's a new list or a nested list
-            const listType = match.match(/^\s*\d+\./) ? 'ol' : 'ul';
-            html += `<${listType}>`;
-            this.listStack.push({ type: listType, indent: indentLevel });
-        } 
-        // Check if we need to close lists due to dedent
-        else if (indentLevel < this.listStack[this.listStack.length - 1].indent) {
-            // Close all lists that are more indented than the current line
-            while (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent > indentLevel) {
-                html += `</li></${this.listStack.pop().type}>`;
             }
-            // If we're at a different indentation level, we might need to close the previous item
-            if (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent === indentLevel) {
+            
+            // Convert the table lines to HTML
+            tableExtractedLines.push(parseTableToHTML(tableLines, headerRow, separatorRow));
+        } else {
+            tableExtractedLines.push(line);
+            i++;
+        }
+    }
+    
+    let html = tableExtractedLines.join('\n')
+        // Headers (# style)
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        
+        // Line breaks - handle explicit line breaks (double space at end of line)
+        .replace(/(\S)  \n/g, '$1<br>\n')
+        
+        // Images with alt text and optional title
+        .replace(/!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g, function(match, alt, src, _, title) {
+            // Handle relative URLs by prepending the base URL
+            let fullSrc = src;
+            if (!src.startsWith('http')) {
+                // Extract base URL from current page URL
+                const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
+                fullSrc = src.startsWith('/') ? window.location.origin + src : baseUrl + src;
+            }
+            
+            return `<a href="${fullSrc}"><img src="${fullSrc}" alt="${alt}" ${title ? `title="${title}"` : ''}></a>`;
+        })
+        
+        // Links
+        .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
+            // Handle relative URLs
+            if (!url.startsWith('http')) {
+                const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
+                url = url.startsWith('/') ? window.location.origin + url : baseUrl + url;
+            }
+            return `<a href="${url}">${text}</a>`;
+        })
+        
+        // Process lists - this is more complex and should handle nesting
+        .replace(/^( *)(?:[*+-]|\d+\.) (.+)$/gm, function(match, indent, content) {
+            // Create an array to keep track of the current list state
+            if (typeof this.listStack === 'undefined') {
+                this.listStack = [];
+            }
+            
+            let indentLevel = indent.length;
+            let html = '';
+            
+            // Check if we're starting a new list
+            if (this.listStack.length === 0 || indentLevel > this.listStack[this.listStack.length - 1].indent) {
+                // It's a new list or a nested list
+                const listType = match.match(/^\s*\d+\./) ? 'ol' : 'ul';
+                html += `<${listType}>`;
+                this.listStack.push({ type: listType, indent: indentLevel });
+            } 
+            // Check if we need to close lists due to dedent
+            else if (indentLevel < this.listStack[this.listStack.length - 1].indent) {
+                // Close all lists that are more indented than the current line
+                while (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent > indentLevel) {
+                    html += `</li></${this.listStack.pop().type}>`;
+                }
+                // If we're at a different indentation level, we might need to close the previous item
+                if (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent === indentLevel) {
+                    html += '</li>';
+                }
+            } 
+            // Same indent level, close previous list item
+            else if (indentLevel === this.listStack[this.listStack.length - 1].indent) {
                 html += '</li>';
             }
-        } 
-        // Same indent level, close previous list item
-        else if (indentLevel === this.listStack[this.listStack.length - 1].indent) {
-            html += '</li>';
+            
+            // Add the new list item
+            html += `<li>${content}`;
+            
+            return html;
+        })
+        
+        // Bold
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        
+        // Italic
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        
+        // Code blocks
+        .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
+        
+        // Inline code
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        
+        // Blockquotes
+        .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
+        
+        // Paragraphs
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/^\s*(.+)/gm, '$1');
+
+    // Clean up any remaining open lists
+    if (this.listStack && this.listStack.length > 0) {
+        let closingTags = '';
+        for (let i = this.listStack.length - 1; i >= 0; i--) {
+            closingTags += `</li></${this.listStack[i].type}>`;
         }
-        
-        // Add the new list item
-        html += `<li>${content}`;
-        
-        return html;
-    })
-    
-    // Bold
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    
-    // Italic
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    
-    // Code blocks
-    .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
-    
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    
-    // Blockquotes
-    .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
-    
-    // Paragraphs
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/^\s*(.+)/gm, '$1');
-
-// Clean up any remaining open lists
-if (this.listStack && this.listStack.length > 0) {
-    let closingTags = '';
-    for (let i = this.listStack.length - 1; i >= 0; i--) {
-        closingTags += `</li></${this.listStack[i].type}>`;
+        html += closingTags;
+        this.listStack = [];
     }
-    html += closingTags;
-    this.listStack = [];
-}
 
-// Table parsing
-let tableHTML = '';
-const lines = processedLines.slice();
-let i = 0;
-
-while (i < lines.length) {
-    const line = lines[i].trim();
-    const nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : '';
-    
-    // Check if this is the start of a table (first row followed by a separator row)
-    if (line.startsWith('|') && line.endsWith('|') && 
-        nextLine.startsWith('|') && nextLine.endsWith('|') && 
-        nextLine.replace(/[^-|]/g, '') === nextLine) {
-        
-        // We found a table with a header
-        const tableLines = [];
-        const headerRow = line;
-        const separatorRow = nextLine;
-        
-        // Add the header row
-        tableLines.push(headerRow);
-        
-        // Skip the separator line since we've already identified it
-        i += 2;
-        
-        // Collect all subsequent table rows
-        while (i < lines.length) {
-            const rowLine = lines[i].trim();
-            if (rowLine.startsWith('|') && rowLine.endsWith('|') && 
-                rowLine !== separatorRow) {
-                tableLines.push(rowLine);
-                lines[i] = ''; // Clear the line to mark it as processed
-                i++;
-            } else {
-                break;
-            }
-        }
-        
-        // Convert the table lines to HTML
-        const tableHTML = parseTableToHTML(tableLines, headerRow, separatorRow);
-        
-        // Replace the header line with the table HTML
-        lines[tableLines.indexOf(headerRow)] = tableHTML;
-        
-        // Skip the line we just processed
-        continue;
-    }
-    i++;
-}
-
-// Join the processed lines back together
-html = lines.join('\n');
+    return `<p>${html}</p>`;
+};
 
 // Function to parse table rows into HTML
 function parseTableToHTML(rows, headerRow, separatorRow) {
@@ -767,8 +763,6 @@ function parseCellContent(content) {
         // Inline code
         .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
-return `<p>${html}</p>`;
-        };
     </script>
 </body>
 </html>
