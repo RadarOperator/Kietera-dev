@@ -2,13 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>~ Markdown Browser</title>
-    <link rel="icon" type="image/png" href="/Kietera-dev/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/Kietera-dev/favicon.svg" />
-    <link rel="shortcut icon" href="/Kietera-dev/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/Kietera-dev/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="~" />
-    <link rel="manifest" href="/Kietera-dev/site.webmanifest" />
+    <title>Markdown Browser</title>
     <style>
         body {
             max-width: 800px;
@@ -17,7 +11,6 @@
             font-family: Georgia, serif;
             line-height: 1.6;
             padding-top: 80px; /* Space for fixed nav */
-            transition: font-family 0.3s ease, font-size 0.3s ease;
         }
         .nav-container {
             position: fixed;
@@ -35,24 +28,128 @@
             gap: 10px;
             border-bottom: 1px solid #ccc;
         }
-        .mode-toggle {
-            font-size: 20px;
-            cursor: pointer;
+        .back-button {
             color: #666;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+        .back-button.active {
+            opacity: 1;
+        }
+        .url-container {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+        }
+        input {
+            width: 100%;
+            padding: 5px 30px 5px 10px;
+            font-family: Georgia, serif;
+            font-size: 16px;
+            border: 1px solid #ccc;
+        }
+        .input-indicator {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 20px;
+            pointer-events: none;
+        }
+        .dir-toggle {
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 16px;
+            cursor: pointer;
             user-select: none;
         }
-        .source-indicator {
-            font-size: 11px;
-            letter-spacing: 1px;
-            color: #666;
-            font-family: Georgia, serif;
-            font-variant: small-caps;
-            width: 80px; /* Fixed width */
-            text-align: center;
+        .font-sample-container {
+            display: flex;
+            align-items: center;
+            margin-left: 10px;
+            gap: 5px;
         }
-        .source-indicator .active {
-            font-weight: bold;
-            color: #333;
+        .font-sample {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-family: Georgia, serif;
+            overflow: hidden;
+        }
+        .size-slider-container {
+            position: relative;
+            width: 120px;
+            height: 30px;
+        }
+        .size-slider {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            margin: 0;
+        }
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #666;
+            position: absolute;
+            width: 100%;
+            bottom: 0;
+            pointer-events: none;
+        }
+        #content {
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+        }
+        /* Markdown styles */
+        h1, h2, h3 { margin-top: 1.5em; }
+        code { 
+            background: #f5f5f5;
+            padding: 2px 5px;
+        }
+        blockquote {
+            border-left: 3px solid #ccc;
+            margin: 0;
+            padding-left: 1em;
+        }
+        a {
+            text-decoration: none;
+            color: #555;
+            padding: 0 2px;
+            border-bottom: 1px solid #ddd;
+        }
+        a:hover {
+            color: #111;
+            border-bottom-color: #999;
+        }
+        a:visited {
+            color: #666;
+        }
+        /* RTL support */
+        .rtl {
+            direction: rtl;
+            text-align: right;
+        }
+        .rtl .input-indicator {
+            right: auto;
+            left: 10px;
+        }
+        .rtl .dir-toggle {
+            right: auto;
+            left: 40px;
         }
         /* Theme styles */
         body.light {
@@ -67,281 +164,28 @@
             background: #f4ecd8;
             color: #5b4636;
         }
-        .dark input {
+        .dark input, .dark .font-sample {
             background: #333;
             color: #ddd;
             border-color: #444;
         }
         .dark .input-indicator,
-        .dark .mode-toggle,
-        .dark .back-button,
-        .dark .direction-toggle,
-        .dark .font-control-toggle {
+        .dark .dir-toggle,
+        .dark .back-button {
             color: #888;
         }
-        .sepia input {
+        .sepia input, .sepia .font-sample {
             background: #f4ecd8;
             color: #5b4636;
             border-color: #d3c4b0;
         }
-        .back-button {
-            color: #666;
-            font-size: 24px;
-            cursor: pointer;
-            user-select: none;
-            opacity: 0.3;
-            transition: opacity 0.2s;
-        }
-        .back-button.active {
-            opacity: 1;
-        }
-        .url-container {
-            position: relative;
-            flex: 1;
-            min-width: 0; /* Prevents flex item from overflowing */
-            display: flex;
-            align-items: center;
-        }
-        input {
-            width: 100%;
-            padding: 5px 30px 5px 10px;
-            font-family: Georgia, serif;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            margin-right: 10px; /* Space for the return indicator */
-        }
-        .input-indicator {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #666;
-            font-size: 20px;
-            pointer-events: none;
-        }
-        #content {
-            border-top: 1px solid #ccc;
-            padding-top: 20px;
-        }
-        /* Markdown styles */
-        h1, h2, h3 { margin-top: 1.5em; }
-        code { 
-            background: #f5f5f5;
-            padding: 2px 5px;
-        }
-        .dark code {
-            background: #333;
-        }
-        .sepia code {
-            background: #ece1cb;
-        }
-        blockquote {
-            border-left: 3px solid #ccc;
-            margin: 0;
-            padding-left: 1em;
-        }
-        a {
-            text-decoration: none;
-            color: #555;  /* Dark gray instead of blue */
-            padding: 0 2px;
-            border-bottom: 1px solid #ddd;  /* Very subtle bottom line */
-        }
-        
-        a:hover {
-            color: #111;
-            border-bottom-color: #999;
-        }
-        
-        a:visited {
-            color: #666;  /* Slightly lighter than unvisited */
-        }
-
-        /* Direction toggle */
-        .direction-toggle {
-            font-size: 22px;
-            cursor: pointer;
-            color: #666;
-            user-select: none;
-            transform-origin: center;
-            transition: transform 0.3s ease;
-            margin: 0 4px;
-            width: 22px;
-            text-align: center;
-            display: inline-block;
-        }
-        .direction-toggle.rtl {
-            transform: rotate(180deg);
-        }
-        .direction-toggle-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-        }
-
-        /* Font controls */
-        .font-control-toggle {
-            font-size: 18px;
-            cursor: pointer;
-            color: #666;
-            user-select: none;
-            width: 25px;
-            height: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: background-color 0.2s;
-        }
-        .font-control-toggle:hover {
-            background-color: rgba(0,0,0,0.05);
-        }
-        .font-control-panel {
-            position: absolute;
-            top: 100%;
-            right: 10px;
-            background: white;
-            border: 1px solid #ddd;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 15px;
-            z-index: 1000;
-            display: none;
-            flex-direction: row;
-            width: 400px;
-            height: 220px;
-            margin-top: 5px;
-        }
-        .dark .font-control-panel {
-            background: #333;
+        .dark .nav-container {
+            background: #222;
             border-color: #444;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
-        .sepia .font-control-panel {
+        .sepia .nav-container {
             background: #f4ecd8;
             border-color: #d3c4b0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .font-control-panel.visible {
-            display: flex;
-        }
-        .size-slider-container {
-            width: 25px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-right: 20px;
-        }
-        .size-slider {
-            height: 150px;
-            position: relative;
-            background-color: #eee;
-            width: 5px;
-            border-radius: 3px;
-        }
-        .dark .size-slider {
-            background-color: #444;
-        }
-        .sepia .size-slider {
-            background-color: #e6dcc8;
-        }
-        .size-slider-handle {
-            position: absolute;
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            background-color: #666;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            cursor: pointer;
-        }
-        .size-value {
-            margin-top: 10px;
-            font-size: 12px;
-            color: #666;
-        }
-        .font-grid-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        .font-grid {
-            flex: 1;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(4, 1fr);
-            gap: 5px;
-            position: relative;
-            border: 1px solid #eee;
-        }
-        .dark .font-grid {
-            border-color: #444;
-        }
-        .sepia .font-grid {
-            border-color: #e6dcc8;
-        }
-        .font-item {
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 15px;
-            border: 1px solid transparent;
-            transition: background-color 0.2s, border-color 0.2s;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            padding: 0 5px;
-        }
-        .font-item:hover {
-            background-color: rgba(0,0,0,0.05);
-        }
-        .font-item.selected {
-            border-color: #999;
-            background-color: rgba(0,0,0,0.05);
-        }
-        .dark .font-item.selected {
-            border-color: #666;
-            background-color: rgba(255,255,255,0.1);
-        }
-        .sepia .font-item.selected {
-            border-color: #d3c4b0;
-            background-color: rgba(0,0,0,0.05);
-        }
-        .grid-axis {
-            position: absolute;
-            font-size: 10px;
-            color: #999;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .grid-axis-x-start {
-            bottom: 100%;
-            left: 0;
-            margin-bottom: 5px;
-        }
-        .grid-axis-x-end {
-            bottom: 100%;
-            right: 0;
-            margin-bottom: 5px;
-        }
-        .grid-axis-y-start {
-            top: 0;
-            left: -25px;
-            transform: rotate(-90deg);
-            transform-origin: bottom right;
-            width: 80px;
-            text-align: right;
-        }
-        .grid-axis-y-end {
-            bottom: 0;
-            left: -25px;
-            transform: rotate(-90deg);
-            transform-origin: bottom right;
-            width: 80px;
-            text-align: right;
         }
     </style>
 </head>
@@ -350,32 +194,17 @@
         <span class="back-button">←</span>
         <div class="url-container">
             <input type="url" id="url" placeholder="Enter markdown URL">
+            <span class="dir-toggle">~</span>
             <span class="input-indicator">⏎</span>
         </div>
-        <div class="direction-toggle-container">
-            <span class="direction-toggle">~</span>
-        </div>
-        <span class="source-indicator">
-            <span class="native">native</span>
-            <span class="dot">·</span>
-            <span class="converted">converted</span>
-        </span>
-        <span class="mode-toggle">☼</span>
-        <span class="font-control-toggle">A</span>
-        <div class="font-control-panel">
+        <div class="font-sample-container">
+            <div class="font-sample">Ga</div>
             <div class="size-slider-container">
-                <div class="size-slider">
-                    <div class="size-slider-handle"></div>
-                </div>
-                <div class="size-value">16px</div>
-            </div>
-            <div class="font-grid-container">
-                <div class="font-grid">
-                    <span class="grid-axis grid-axis-x-start">Traditional</span>
-                    <span class="grid-axis grid-axis-x-end">Modern</span>
-                    <span class="grid-axis grid-axis-y-start">Formal</span>
-                    <span class="grid-axis grid-axis-y-end">Casual</span>
-                    <!-- Fonts will be populated here -->
+                <input type="range" min="0.5" max="1.5" step="0.1" value="1" class="size-slider" id="font-size-slider">
+                <div class="slider-labels">
+                    <span>S</span>
+                    <span>M</span>
+                    <span>L</span>
                 </div>
             </div>
         </div>
@@ -387,164 +216,51 @@
         const contentDiv = document.getElementById('content');
         const backButton = document.querySelector('.back-button');
         const indicator = document.querySelector('.input-indicator');
-        const directionToggle = document.querySelector('.direction-toggle');
-        const fontControlToggle = document.querySelector('.font-control-toggle');
-        const fontControlPanel = document.querySelector('.font-control-panel');
-        const sizeSliderHandle = document.querySelector('.size-slider-handle');
-        const sizeValue = document.querySelector('.size-value');
-        const fontGrid = document.querySelector('.font-grid');
+        const dirToggle = document.querySelector('.dir-toggle');
+        const fontSample = document.querySelector('.font-sample');
+        const fontSizeSlider = document.getElementById('font-size-slider');
         
-        // Direction toggle state
+        // Set initial font size to match slider middle position
+        document.body.style.fontSize = '1em';
+        fontSample.style.fontSize = '1em';
+        
+        // Direction toggle
         let isRTL = false;
+        dirToggle.addEventListener('click', () => {
+            isRTL = !isRTL;
+            if (isRTL) {
+                document.body.classList.add('rtl');
+                dirToggle.textContent = '~'; // Same symbol but in RTL context
+                dirToggle.style.transform = 'translateY(-50%) scaleX(-1)'; // Flip horizontally
+            } else {
+                document.body.classList.remove('rtl');
+                dirToggle.textContent = '~';
+                dirToggle.style.transform = 'translateY(-50%)';
+            }
+        });
         
-        // Font control state
-        let fontSize = 16;
-        let currentFont = 'Georgia, serif';
+        // Font size slider
+        fontSizeSlider.addEventListener('input', (e) => {
+            const size = e.target.value + 'em';
+            document.body.style.fontSize = size;
+            fontSample.style.fontSize = size;
+        });
         
         // History management
         const history = [];
         let currentIndex = -1;
         
         // Loading animation frames
-        const loadingFrames = ['∼', '∽'];
+        const loadingFrames = ['⋮', '⋰', '⋯', '⋱'];
         let loadingInterval;
         let frameIndex = 0;
-        
-        // Direction toggle
-        directionToggle.addEventListener('click', () => {
-            isRTL = !isRTL;
-            if (isRTL) {
-                directionToggle.classList.add('rtl');
-                document.body.style.direction = 'rtl';
-                urlInput.style.direction = 'rtl';
-                contentDiv.style.direction = 'rtl';
-            } else {
-                directionToggle.classList.remove('rtl');
-                document.body.style.direction = 'ltr';
-                urlInput.style.direction = 'ltr';
-                contentDiv.style.direction = 'ltr';
-            }
-            localStorage.setItem('direction', isRTL ? 'rtl' : 'ltr');
-        });
-        
-        // Font controls
-        fontControlToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            fontControlPanel.classList.toggle('visible');
-        });
-        
-        // Close font panel when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!fontControlPanel.contains(e.target) && e.target !== fontControlToggle) {
-                fontControlPanel.classList.remove('visible');
-            }
-        });
-        
-        // Font grid setup
-        const fonts = [
-            // Traditional & Formal (top-left)
-            { name: 'Georgia', family: 'Georgia, serif', x: 0, y: 0 },
-            { name: 'Garamond', family: '"EB Garamond", "Garamond", serif', x: 0, y: 0 },
-            { name: 'Times', family: '"Times New Roman", Times, serif', x: 1, y: 0 },
-            { name: 'Baskerville', family: '"Libre Baskerville", Baskerville, serif', x: 1, y: 1 },
-            
-            // Traditional & Casual
-            { name: 'Palatino', family: '"Palatino Linotype", Palatino, serif', x: 0, y: 2 },
-            { name: 'Bookman', family: '"Bookman Old Style", serif', x: 1, y: 2 },
-            { name: 'Schoolbook', family: '"Century Schoolbook", serif', x: 0, y: 3 },
-            { name: 'Calligraphic', family: '"Segoe Script", "Brush Script MT", cursive', x: 1, y: 3 },
-            
-            // Modern & Formal
-            { name: 'Futura', family: 'Futura, "Century Gothic", sans-serif', x: 2, y: 0 },
-            { name: 'Helvetica', family: 'Helvetica, Arial, sans-serif', x: 3, y: 0 },
-            { name: 'Optima', family: 'Optima, sans-serif', x: 2, y: 1 },
-            { name: 'Gill Sans', family: '"Gill Sans", sans-serif', x: 3, y: 1 },
-            
-            // Modern & Casual
-            { name: 'Trebuchet', family: '"Trebuchet MS", sans-serif', x: 2, y: 2 },
-            { name: 'Lucida', family: '"Lucida Sans", sans-serif', x: 3, y: 2 },
-            { name: 'Verdana', family: 'Verdana, sans-serif', x: 2, y: 3 },
-            { name: 'Comic', family: '"Comic Sans MS", cursive', x: 3, y: 3 }
-        ];
-        
-        // Populate font grid
-        fonts.forEach(font => {
-            const fontItem = document.createElement('div');
-            fontItem.className = 'font-item';
-            fontItem.textContent = font.name;
-            fontItem.style.fontFamily = font.family;
-            fontItem.style.gridColumn = font.x + 1;
-            fontItem.style.gridRow = font.y + 1;
-            
-            if (font.family === currentFont) {
-                fontItem.classList.add('selected');
-            }
-            
-            fontItem.addEventListener('click', () => {
-                document.querySelectorAll('.font-item').forEach(item => item.classList.remove('selected'));
-                fontItem.classList.add('selected');
-                currentFont = font.family;
-                document.body.style.fontFamily = currentFont;
-                localStorage.setItem('fontFamily', currentFont);
-            });
-            
-            fontGrid.appendChild(fontItem);
-        });
-        
-        // Size slider
-        let isDragging = false;
-        
-        const updateFontSize = (y) => {
-            const sliderHeight = document.querySelector('.size-slider').offsetHeight;
-            const percent = 1 - Math.max(0, Math.min(1, y / sliderHeight));
-            fontSize = 12 + Math.round(percent * 12); // Range from 12px to 24px
-            sizeSliderHandle.style.top = `${y}px`;
-            sizeValue.textContent = `${fontSize}px`;
-            document.body.style.fontSize = `${fontSize}px`;
-            localStorage.setItem('fontSize', fontSize);
-        };
-        
-        const getSliderY = (e) => {
-            const slider = document.querySelector('.size-slider');
-            const rect = slider.getBoundingClientRect();
-            return Math.max(0, Math.min(rect.height, e.clientY - rect.top));
-        };
-        
-        sizeSliderHandle.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            isDragging = true;
-        });
-        
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const y = getSliderY(e);
-                updateFontSize(y);
-            }
-        });
-        
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
-        
-        document.querySelector('.size-slider').addEventListener('click', (e) => {
-            const y = getSliderY(e);
-            updateFontSize(y);
-        });
-        
-        // Initialize font size slider
-        const initSlider = () => {
-            const sliderHeight = document.querySelector('.size-slider').offsetHeight;
-            const percent = (fontSize - 12) / 12; // Convert font size to percent
-            const y = sliderHeight * (1 - percent);
-            sizeSliderHandle.style.top = `${y}px`;
-        };
         
         function startLoading() {
             frameIndex = 0;
             loadingInterval = setInterval(() => {
                 indicator.textContent = loadingFrames[frameIndex];
                 frameIndex = (frameIndex + 1) % loadingFrames.length;
-            }, 400);
+            }, 250);
         }
         
         function stopLoading() {
@@ -567,87 +283,58 @@
             }
         }
 
-        // Add source type to history entries
         async function fetchContent(url, isNavigation = true) {
             startLoading();
             
             let content = null;
-            let isNative = false; // Track if content is native markdown
             
             // Try direct URL if it ends with .md
             if (url.endsWith('.md')) {
                 content = await tryFetch(url);
-                if (content) isNative = true;
             }
             
             // Try appending index.md
             if (!content && !url.endsWith('.md')) {
                 const mdUrl = url.endsWith('/') ? url + 'index.md' : url + '/index.md';
                 content = await tryFetch(mdUrl);
-                if (content) isNative = true;
             }
             
             // Try r.jina.ai
             if (!content) {
-                if (!url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
-                    const jinaUrl = 'https://r.jina.ai/' + (url.startsWith('http') ? url : '/' + url);
-                    content = await tryFetch(jinaUrl);
-                } else {
-                    window.location.href = url;
-                    return;
-                }
+                const jinaUrl = 'https://r.jina.ai' + (url.startsWith('http') ? url : '/' + url);
+                content = await tryFetch(jinaUrl);
             }
             
             stopLoading();
             
             if (content) {
                 if (isNavigation) {
-                    // Store both URL and source type in history
+                    // Update history
                     history.splice(currentIndex + 1);
-                    history.push({ url, isNative });
+                    history.push(url);
                     currentIndex++;
                     backButton.classList.add('active');
                 }
-                updateSourceIndicator(isNative);
                 contentDiv.innerHTML = parseMarkdown(content);
                 setupLinks();
             } else {
                 contentDiv.innerHTML = `<p>Could not load content from ${url}</p>`;
             }
         }
-
-        // Update back button handler
+        
+        // Handle back button
         backButton.addEventListener('click', () => {
             if (currentIndex > 0) {
                 currentIndex--;
-                const previousEntry = history[currentIndex];
-                urlInput.value = previousEntry.url;
-                fetchContent(previousEntry.url, false);
-                updateSourceIndicator(previousEntry.isNative);
+                const previousUrl = history[currentIndex];
+                urlInput.value = previousUrl;
+                fetchContent(previousUrl, false);
                 if (currentIndex === 0) {
                     backButton.classList.remove('active');
                 }
             }
         });
 
-        // Theme cycling
-        const themes = ['light', 'dark', 'sepia'];
-        const themeSymbols = ['☼', '☾', '∗'];
-        let currentTheme = 0;
-        
-        document.querySelector('.mode-toggle').addEventListener('click', () => {
-            currentTheme = (currentTheme + 1) % themes.length;
-            document.body.className = themes[currentTheme];
-            document.querySelector('.mode-toggle').textContent = themeSymbols[currentTheme];
-            localStorage.setItem('theme', currentTheme);
-        });
-
-        // Update source indicator
-        function updateSourceIndicator(isNative) {
-            document.querySelector('.native').classList.toggle('active', isNative);
-            document.querySelector('.converted').classList.toggle('active', !isNative);
-        }
-        
         // Handle URL input
         urlInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -667,6 +354,34 @@
                     fetchContent(url);
                 });
             });
+        }
+
+        // Theme cycling
+        const themeToggle = document.createElement('span');
+        themeToggle.textContent = '☼';
+        themeToggle.style.cursor = 'pointer';
+        themeToggle.style.marginLeft = '10px';
+        themeToggle.style.fontSize = '20px';
+        themeToggle.style.color = '#666';
+        document.querySelector('.font-sample-container').appendChild(themeToggle);
+        
+        const themes = ['light', 'dark', 'sepia'];
+        const themeSymbols = ['☼', '☾', '∗'];
+        let currentTheme = 0;
+        
+        themeToggle.addEventListener('click', () => {
+            currentTheme = (currentTheme + 1) % themes.length;
+            document.body.className = themes[currentTheme];
+            themeToggle.textContent = themeSymbols[currentTheme];
+            localStorage.setItem('theme', currentTheme);
+        });
+        
+        // Restore theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme !== null) {
+            currentTheme = parseInt(savedTheme);
+            document.body.className = themes[currentTheme];
+            themeToggle.textContent = themeSymbols[currentTheme];
         }
 
         // Markdown parser
@@ -726,52 +441,6 @@
 
             return `<p>${html}</p>`;
         };
-
-        // Initialize settings from localStorage
-        document.addEventListener('DOMContentLoaded', () => {
-            // Restore theme
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme !== null) {
-                currentTheme = parseInt(savedTheme);
-                document.body.className = themes[currentTheme];
-                document.querySelector('.mode-toggle').textContent = themeSymbols[currentTheme];
-            }
-            
-            // Restore direction
-            const savedDirection = localStorage.getItem('direction');
-            if (savedDirection === 'rtl') {
-                isRTL = true;
-                directionToggle.classList.add('rtl');
-                document.body.style.direction = 'rtl';
-                urlInput.style.direction = 'rtl';
-                contentDiv.style.direction = 'rtl';
-            }
-            
-            // Restore font settings
-            const savedFontFamily = localStorage.getItem('fontFamily');
-            if (savedFontFamily) {
-                currentFont = savedFontFamily;
-                document.body.style.fontFamily = currentFont;
-                const fontItem = Array.from(document.querySelectorAll('.font-item')).find(item => {
-                    const font = fonts.find(f => f.family === currentFont);
-                    return item.textContent === (font ? font.name : 'Georgia');
-                });
-                if (fontItem) {
-                    document.querySelectorAll('.font-item').forEach(item => item.classList.remove('selected'));
-                    fontItem.classList.add('selected');
-                }
-            }
-            
-            const savedFontSize = localStorage.getItem('fontSize');
-            if (savedFontSize) {
-                fontSize = parseInt(savedFontSize);
-                document.body.style.fontSize = `${fontSize}px`;
-                sizeValue.textContent = `${fontSize}px`;
-            }
-            
-            // Initialize slider position
-            setTimeout(initSlider, 100); // Slight delay to ensure slider dimensions are calculated
-        });
     </script>
 </body>
 </html>
