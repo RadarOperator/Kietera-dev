@@ -620,9 +620,9 @@ const parseMarkdown = (text) => {
         .replace(/(?<!<\/ul>\n)(<li>.*<\/li>\n?)+/g, '<ol>$&</ol>')
         // Paragraphs
         .replace(/\n\n/g, '</p><p>')
-        .replace(/^\s*(.+)/gm, '$1');
+        .replace(/^\s*(.+)/gm, '$1')
         // Images
-        .replace(/!\[([^\]]+)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1">')
+        .replace(/!\[([^\]]+)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1">');
     // Function to render tables
     function renderTable(rows) {
         if (rows.length < 3) return rows.join('\n'); // Not enough rows for a valid table
