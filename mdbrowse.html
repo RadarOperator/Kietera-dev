@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Tilde Markdown Browser v30</title>
+    <title>Tilde Markdown Browser v31</title>
     <link rel="icon" type="image/png" href="/Kietera-dev/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/Kietera-dev/favicon.svg" />
     <link rel="shortcut icon" href="/Kietera-dev/favicon.ico" />
@@ -539,7 +539,7 @@
             });
         }
 
-// Markdown parser based on Marked.js patterns
+// Fixed Markdown parser with proper table and image handling
 const parseMarkdown = (text) => {
     // Extract content after "Markdown Content:"
     const contentStart = text.indexOf("Markdown Content:");
@@ -547,106 +547,193 @@ const parseMarkdown = (text) => {
     
     // Split into lines for processing
     const lines = content.split('\n');
-    const processedLines = [];
+    let processedContent = '';
+    let inList = false;
+    let listStack = [];
     
-    // First pass: Process tables and underline-style headers
+    // Process line by line
     let i = 0;
     while (i < lines.length) {
-        const line = lines[i];
+        let line = lines[i];
         const nextLine = lines[i + 1] || '';
         
-        // Check for underline-style headers (using marked.js approach)
-        if (nextLine && !nextLine.trim().match(/^[^|]/) && (
-            nextLine.trim().match(/^=+(?:=+)?$/) ||
-            nextLine.trim().match(/^-+(?:-+)?$/)
-        )) {
-            if (nextLine.trim().match(/^=+(?:=+)?$/)) {
-                processedLines.push('# ' + line);
-            } else {
-                processedLines.push('## ' + line);
+        // Check for headers (ATX style with #)
+        if (line.match(/^#{1,6}\s/)) {
+            // Close any open lists when encountering a header
+            if (inList) {
+                while (listStack.length > 0) {
+                    const type = listStack.pop();
+                    processedContent += `</li></${type}>\n`;
+                }
+                inList = false;
             }
-            i += 2; // Skip the underline
+            
+            const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+            if (headerMatch) {
+                const level = headerMatch[1].length;
+                processedContent += `<h${level}>${headerMatch[2]}</h${level}>\n`;
+            } else {
+                processedContent += line + '\n';
+            }
+            i++;
+            continue;
         }
-        // Tables - using marked.js approach for detecting tables
-        else if (
-            line.trim().startsWith('|') && 
-            line.trim().endsWith('|') && 
-            nextLine && 
-            nextLine.trim().startsWith('|') && 
-            nextLine.trim().endsWith('|') && 
-            nextLine.trim().match(/^[\s\-:|]+$/)
-        ) {
-            // Collect all table rows
+        
+        // Check for underline-style headers
+        if (nextLine && (nextLine.match(/^=+$/) || nextLine.match(/^-+$/))) {
+            // Close any open lists when encountering a header
+            if (inList) {
+                while (listStack.length > 0) {
+                    const type = listStack.pop();
+                    processedContent += `</li></${type}>\n`;
+                }
+                inList = false;
+            }
+            
+            const level = nextLine.match(/^=+$/) ? 1 : 2;
+            processedContent += `<h${level}>${line}</h${level}>\n`;
+            i += 2; // Skip the current line and the underline
+            continue;
+        }
+        
+        // Check for tables - more robust detection
+        if (line.trim().startsWith('|') && line.trim().endsWith('|') && 
+            nextLine && nextLine.trim().startsWith('|') && nextLine.trim().endsWith('|') &&
+            nextLine.replace(/[^-:|]/g, '').length === nextLine.trim().length - 2) {
+            
+            // We found a table
             const tableRows = [];
-            tableRows.push(line.trim());   // Header row
-            tableRows.push(nextLine.trim()); // Separator row
+            tableRows.push(line.trim());        // Header row
+            tableRows.push(nextLine.trim());    // Separator row
             i += 2; // Skip header and separator
             
-            // Collect additional rows
+            // Collect all data rows
             while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
                 tableRows.push(lines[i].trim());
                 i++;
             }
             
-            processedLines.push(renderTable(tableRows));
+            // Render the table
+            const tableHTML = renderTable(tableRows);
+            processedContent += tableHTML + '\n';
             continue;
         }
-        else {
-            processedLines.push(line);
+        
+        // Check for list items
+        const listMatch = line.match(/^(\s*)([*+-]|\d+\.)\s+(.+)$/);
+        if (listMatch) {
+            const [_, indent, marker, content] = listMatch;
+            const indentLevel = indent.length;
+            const isOrdered = /^\d+\./.test(marker);
+            const listType = isOrdered ? 'ol' : 'ul';
+            
+            // Start a new list or adjust existing list structure
+            if (!inList) {
+                processedContent += `<${listType}>\n`;
+                listStack.push(listType);
+                inList = true;
+            } else {
+                // Check indentation to handle nesting
+                if (indentLevel > (listStack.length - 1) * 2) {
+                    // This is a nested list
+                    processedContent += `<${listType}>\n`;
+                    listStack.push(listType);
+                } else if (indentLevel < (listStack.length - 1) * 2) {
+                    // Moving back out to a less nested level
+                    while (listStack.length > indentLevel / 2 + 1) {
+                        const type = listStack.pop();
+                        processedContent += `</li></${type}>\n`;
+                    }
+                } else {
+                    // Same level, close previous item
+                    processedContent += '</li>\n';
+                }
+            }
+            
+            // Add the list item content
+            processedContent += `<li>${content}`;
             i++;
+            
+            // Handle multi-line list items (including content like tables, code blocks, etc.)
+            let multiLineContent = '';
+            while (i < lines.length) {
+                const nextLine = lines[i];
+                // If next line starts a new list item or is blank, break
+                if (nextLine.match(/^\s*([*+-]|\d+\.)\s+/) || nextLine.trim() === '') {
+                    break;
+                }
+                // If next line starts a table, collect the entire table
+                if (nextLine.trim().startsWith('|') && nextLine.trim().endsWith('|') &&
+                    i+1 < lines.length && lines[i+1].trim().startsWith('|') && 
+                    lines[i+1].trim().endsWith('|') &&
+                    lines[i+1].replace(/[^-:|]/g, '').length === lines[i+1].trim().length - 2) {
+                    
+                    const tableStart = i;
+                    const tableRows = [];
+                    tableRows.push(nextLine.trim());     // Header row
+                    tableRows.push(lines[i+1].trim());   // Separator row
+                    i += 2;
+                    
+                    // Collect all data rows
+                    while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+                        tableRows.push(lines[i].trim());
+                        i++;
+                    }
+                    
+                    multiLineContent += renderTable(tableRows) + '\n';
+                    continue;
+                }
+                
+                // Normal content, add it to the multi-line buffer
+                multiLineContent += nextLine + '\n';
+                i++;
+            }
+            
+            // Process any collected multi-line content
+            if (multiLineContent) {
+                // Process the multi-line content for markdown formatting
+                multiLineContent = processInlineMarkdown(multiLineContent);
+                processedContent += multiLineContent;
+            }
+            
+            continue;
+        }
+        
+        // Not a list item - close any open lists
+        if (inList && line.trim() !== '') {
+            while (listStack.length > 0) {
+                const type = listStack.pop();
+                processedContent += `</li></${type}>\n`;
+            }
+            inList = false;
+        }
+        
+        // Handle blank lines
+        if (line.trim() === '') {
+            processedContent += '\n';
+            i++;
+            continue;
+        }
+        
+        // Regular paragraph text
+        processedContent += line + '\n';
+        i++;
+    }
+    
+    // Close any remaining open lists
+    if (inList) {
+        while (listStack.length > 0) {
+            const type = listStack.pop();
+            processedContent += `</li></${type}>\n`;
         }
     }
     
-    // Join processed lines back to text
-    let html = processedLines.join('\n');
+    // Process inline markdown and blocks
+    processedContent = processInlineMarkdown(processedContent);
     
-    // Process block-level elements first (marked.js approach)
-    
-    // Code blocks with language identifier (```js code ```)
-    html = html.replace(/```([a-zA-Z0-9_]+)?\n([\s\S]*?)\n```/g, '<pre><code class="language-$1">$2</code></pre>');
-    
-    // Simple code blocks (indented by 4 spaces or 1 tab)
-    html = html.replace(/^(?: {4}|\t)(.*)/gm, '<pre><code>$1</code></pre>');
-    
-    // Headers (ATX style with #)
-    html = html.replace(/^(#{1,6})[ \t]+(.+?)[ \t]*#*$/gm, function(match, hashes, content) {
-        const level = hashes.length;
-        return `<h${level}>${content}</h${level}>`;
-    });
-    
-    // Blockquotes
-    html = html.replace(/^>[ \t]?(.+)$/gm, '<blockquote>$1</blockquote>');
-    
-    // Horizontal rules (using marked.js pattern)
-    html = html.replace(/^(?:[\t ]*)(?:[-*_])(?:[\t ]*\1){2,}(?:[\t ]*)$/gm, '<hr>');
-    
-    // Images (using marked.js pattern)
-    html = html.replace(/!\[((?:\[[^\]]*\]|[^\[\]]|\](?=[^\[]*\]))*)\]\(\s*<?([\s\S]*?)>?(?:\s+['"]([^\s]*)['"]\s*)?\)/g, 
-                      '<img src="$2" alt="$1" title="$3">');
-    
-    // Links (using marked.js pattern)
-    html = html.replace(/\[((?:\[[^\]]*\]|[^\[\]]|\](?=[^\[]*\]))*)\]\(\s*<?([\s\S]*?)>?(?:\s+['"]([^\s]*)['"]\s*)?\)/g, 
-                      '<a href="$2" title="$3">$1</a>');
-    
-    // Strong (bold)
-    html = html.replace(/\*\*([\s\S]+?)\*\*(?!\*)/g, '<strong>$1</strong>');
-    html = html.replace(/__([\s\S]+?)__(?!_)/g, '<strong>$1</strong>');
-    
-    // Emphasis (italic)
-    html = html.replace(/\b_((?:__|[\s\S])+?)_\b|^\*((?:\*\*|[\s\S])+?)\*(?!\*)/gm, '<em>$1$2</em>');
-    
-    // Inline code
-    html = html.replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, '<code>$2</code>');
-    
-    // Process lists (adapted from marked.js approach)
-    html = processLists(html);
-    
-    // Paragraphs and line breaks
-    html = html.replace(/\n\n+/g, '</p><p>');
-    
-    // Tables rendering function
+    // Function to render tables
     function renderTable(rows) {
-        if (rows.length < 3) return rows.join('\n'); // Need at least header, separator, and one data row
+        if (rows.length < 3) return rows.join('\n'); // Not enough rows for a proper table
         
         const headerRow = rows[0];
         const separatorRow = rows[1];
@@ -654,12 +741,12 @@ const parseMarkdown = (text) => {
         
         // Parse header cells
         const headers = headerRow.split('|')
-            .filter(cell => cell.trim() !== '')
-            .map(cell => cell.trim());
+            .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+            .map(cell => processInlineMarkdown(cell.trim()));
         
         // Parse alignment from separator row
         const alignments = separatorRow.split('|')
-            .filter(cell => cell.trim() !== '')
+            .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
             .map(cell => {
                 cell = cell.trim();
                 if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
@@ -682,8 +769,8 @@ const parseMarkdown = (text) => {
         // Add data rows
         dataRows.forEach(row => {
             const cells = row.split('|')
-                .filter(cell => cell.trim() !== '')
-                .map(cell => cell.trim());
+                .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+                .map(cell => processInlineMarkdown(cell.trim()));
             
             tableHTML += '<tr>\n';
             
@@ -699,60 +786,35 @@ const parseMarkdown = (text) => {
         return tableHTML;
     }
     
-    // Process lists (using patterns similar to marked.js)
-    function processLists(html) {
-        // Define list regex patterns
-        const listItemRegex = /^( *)(?:[*+-]|\d+\.) +([^\n]*(?:\n(?!\1(?:[*+-]|\d+\.) )[^\n]*)*)(?:\n+|$)/gm;
-        const bulletListStart = '<ul>\n';
-        const bulletListEnd = '</ul>\n';
-        const orderedListStart = '<ol>\n';
-        const orderedListEnd = '</ol>\n';
-        
-        // Replace list items with HTML, tracking indentation
-        const listStack = [];
-        
-        html = html.replace(listItemRegex, function(match, indent, text) {
-            const isOrdered = match.match(/^\s*\d+\./);
-            const listTag = isOrdered ? 'ol' : 'ul';
-            const indentLevel = indent.length;
-            let result = '';
+    // Process inline markdown elements
+    function processInlineMarkdown(text) {
+        return text
+            // Code blocks
+            .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
             
-            // Close lists if needed
-            while (listStack.length > 0 && listStack[listStack.length - 1].indent > indentLevel) {
-                const item = listStack.pop();
-                result += item.type === 'ol' ? orderedListEnd : bulletListEnd;
-            }
+            // Images
+            .replace(/!\[([^\]]*)\]\(([^")\s]+)(?:\s+"([^"]+)")?\)/g, '<img src="$2" alt="$1" title="$3">')
             
-            // Start new list if needed
-            if (listStack.length === 0 || listStack[listStack.length - 1].indent < indentLevel) {
-                result += isOrdered ? orderedListStart : bulletListStart;
-                listStack.push({ type: listTag, indent: indentLevel });
-            } 
-            // Close current list item if same level
-            else if (listStack[listStack.length - 1].indent === indentLevel) {
-                result += '</li>\n';
-            }
+            // Links
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
             
-            // Process text content - apply inline formatting
-            text = text.trim()
-                .replace(/\n+$/, '') // Remove trailing newlines
-                .replace(/\n/g, '<br>'); // Convert internal newlines to <br>
+            // Bold
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<strong>$1</strong>')
             
-            result += '<li>' + text;
-            return result;
-        });
-        
-        // Close any remaining open lists
-        while (listStack.length > 0) {
-            const item = listStack.pop();
-            html += '</li>\n';
-            html += item.type === 'ol' ? orderedListEnd : bulletListEnd;
-        }
-        
-        return html;
+            // Italic
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/_([^_]+)_/g, '<em>$1</em>')
+            
+            // Inline code
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            
+            // Blockquotes
+            .replace(/^>\s?(.+)$/gm, '<blockquote>$1</blockquote>');
     }
     
-    return `<p>${html}</p>`;
+    // Wrap in paragraphs
+    return `<p>${processedContent}</p>`;
 };
     </script>
 </body>
