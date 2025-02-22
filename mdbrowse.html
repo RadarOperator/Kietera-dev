@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Tilde Markdown Browser v29</title>
+    <title>Tilde Markdown Browser v30</title>
     <link rel="icon" type="image/png" href="/Kietera-dev/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/Kietera-dev/favicon.svg" />
     <link rel="shortcut icon" href="/Kietera-dev/favicon.ico" />
@@ -539,93 +539,114 @@
             });
         }
 
-// Markdown parser
+// Markdown parser based on Marked.js patterns
 const parseMarkdown = (text) => {
     // Extract content after "Markdown Content:"
     const contentStart = text.indexOf("Markdown Content:");
     const content = contentStart !== -1 ? text.slice(contentStart + 17) : text;
     
-    // Split into lines for underline header processing
+    // Split into lines for processing
     const lines = content.split('\n');
     const processedLines = [];
     
-    // First pass: Handle underline headers and detect tables
+    // First pass: Process tables and underline-style headers
     let i = 0;
     while (i < lines.length) {
         const line = lines[i];
         const nextLine = lines[i + 1] || '';
         
-        // Check for underline-style headers
-        if (nextLine.match(/^=+$/)) {
-            processedLines.push('# ' + line);
-            i += 2; // Skip the underline
-        } 
-        else if (nextLine.match(/^-+$/)) {
-            processedLines.push('## ' + line);
+        // Check for underline-style headers (using marked.js approach)
+        if (nextLine && !nextLine.trim().match(/^[^|]/) && (
+            nextLine.trim().match(/^=+(?:=+)?$/) ||
+            nextLine.trim().match(/^-+(?:-+)?$/)
+        )) {
+            if (nextLine.trim().match(/^=+(?:=+)?$/)) {
+                processedLines.push('# ' + line);
+            } else {
+                processedLines.push('## ' + line);
+            }
             i += 2; // Skip the underline
         }
-        // Check for tables - a line starting and ending with | followed by a separator line
-        else if (line.trim().startsWith('|') && line.trim().endsWith('|') && 
-                 nextLine.trim().startsWith('|') && nextLine.trim().endsWith('|') &&
-                 nextLine.replace(/[^-:|]/g, '').length === nextLine.trim().length - 2) {
-            
-            // We found a table - collect all the rows
+        // Tables - using marked.js approach for detecting tables
+        else if (
+            line.trim().startsWith('|') && 
+            line.trim().endsWith('|') && 
+            nextLine && 
+            nextLine.trim().startsWith('|') && 
+            nextLine.trim().endsWith('|') && 
+            nextLine.trim().match(/^[\s\-:|]+$/)
+        ) {
+            // Collect all table rows
             const tableRows = [];
-            tableRows.push(line.trim());       // Header row
-            tableRows.push(nextLine.trim());   // Separator row
-            i += 2; // Move past header and separator
+            tableRows.push(line.trim());   // Header row
+            tableRows.push(nextLine.trim()); // Separator row
+            i += 2; // Skip header and separator
             
-            // Collect data rows
+            // Collect additional rows
             while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
                 tableRows.push(lines[i].trim());
                 i++;
             }
             
-            // Process table and add HTML to output
             processedLines.push(renderTable(tableRows));
+            continue;
         }
         else {
             processedLines.push(line);
             i++;
         }
     }
-
-    // Process the rest of markdown elements
-    let html = processedLines.join('\n')
-        // Headers (# style)
-        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-        // Links
-        .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
-        // Bold
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        // Italic
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        // Code blocks
-        .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
-        // Inline code
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // Blockquotes
-        .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
-        // Lists
-        .replace(/^( *)[\*\+\-] (.+)(?!<\/table>)/gm, function(match, indent, content) {
-        return indent + '<li>' + content + '</li>';
-        })
-        .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-        // Ordered lists
-        .replace(/^( *)\d+\. (.+)/gm, function(match, indent, content) {
-            return indent + '<li>' + content + '</li>';
-        })
-        .replace(/(?<!<\/ul>\n)(<li>.*<\/li>\n?)+/g, '<ol>$&</ol>')
-        // Paragraphs
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/^\s*(.+)/gm, '$1')
-        // Images
-        .replace(/!\[([^\]]+)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1">');
-    // Function to render tables
+    
+    // Join processed lines back to text
+    let html = processedLines.join('\n');
+    
+    // Process block-level elements first (marked.js approach)
+    
+    // Code blocks with language identifier (```js code ```)
+    html = html.replace(/```([a-zA-Z0-9_]+)?\n([\s\S]*?)\n```/g, '<pre><code class="language-$1">$2</code></pre>');
+    
+    // Simple code blocks (indented by 4 spaces or 1 tab)
+    html = html.replace(/^(?: {4}|\t)(.*)/gm, '<pre><code>$1</code></pre>');
+    
+    // Headers (ATX style with #)
+    html = html.replace(/^(#{1,6})[ \t]+(.+?)[ \t]*#*$/gm, function(match, hashes, content) {
+        const level = hashes.length;
+        return `<h${level}>${content}</h${level}>`;
+    });
+    
+    // Blockquotes
+    html = html.replace(/^>[ \t]?(.+)$/gm, '<blockquote>$1</blockquote>');
+    
+    // Horizontal rules (using marked.js pattern)
+    html = html.replace(/^(?:[\t ]*)(?:[-*_])(?:[\t ]*\1){2,}(?:[\t ]*)$/gm, '<hr>');
+    
+    // Images (using marked.js pattern)
+    html = html.replace(/!\[((?:\[[^\]]*\]|[^\[\]]|\](?=[^\[]*\]))*)\]\(\s*<?([\s\S]*?)>?(?:\s+['"]([^\s]*)['"]\s*)?\)/g, 
+                      '<img src="$2" alt="$1" title="$3">');
+    
+    // Links (using marked.js pattern)
+    html = html.replace(/\[((?:\[[^\]]*\]|[^\[\]]|\](?=[^\[]*\]))*)\]\(\s*<?([\s\S]*?)>?(?:\s+['"]([^\s]*)['"]\s*)?\)/g, 
+                      '<a href="$2" title="$3">$1</a>');
+    
+    // Strong (bold)
+    html = html.replace(/\*\*([\s\S]+?)\*\*(?!\*)/g, '<strong>$1</strong>');
+    html = html.replace(/__([\s\S]+?)__(?!_)/g, '<strong>$1</strong>');
+    
+    // Emphasis (italic)
+    html = html.replace(/\b_((?:__|[\s\S])+?)_\b|^\*((?:\*\*|[\s\S])+?)\*(?!\*)/gm, '<em>$1$2</em>');
+    
+    // Inline code
+    html = html.replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, '<code>$2</code>');
+    
+    // Process lists (adapted from marked.js approach)
+    html = processLists(html);
+    
+    // Paragraphs and line breaks
+    html = html.replace(/\n\n+/g, '</p><p>');
+    
+    // Tables rendering function
     function renderTable(rows) {
-        if (rows.length < 3) return rows.join('\n'); // Not enough rows for a valid table
+        if (rows.length < 3) return rows.join('\n'); // Need at least header, separator, and one data row
         
         const headerRow = rows[0];
         const separatorRow = rows[1];
@@ -633,12 +654,12 @@ const parseMarkdown = (text) => {
         
         // Parse header cells
         const headers = headerRow.split('|')
-            .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+            .filter(cell => cell.trim() !== '')
             .map(cell => cell.trim());
         
         // Parse alignment from separator row
         const alignments = separatorRow.split('|')
-            .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+            .filter(cell => cell.trim() !== '')
             .map(cell => {
                 cell = cell.trim();
                 if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
@@ -647,7 +668,7 @@ const parseMarkdown = (text) => {
                 return '';
             });
         
-        // Start building table HTML
+        // Build table HTML
         let tableHTML = '<table>\n<thead>\n<tr>\n';
         
         // Add header cells
@@ -661,7 +682,7 @@ const parseMarkdown = (text) => {
         // Add data rows
         dataRows.forEach(row => {
             const cells = row.split('|')
-                .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+                .filter(cell => cell.trim() !== '')
                 .map(cell => cell.trim());
             
             tableHTML += '<tr>\n';
@@ -674,10 +695,63 @@ const parseMarkdown = (text) => {
             tableHTML += '</tr>\n';
         });
         
-        tableHTML += '</tbody>\n</table>\n';
+        tableHTML += '</tbody>\n</table>';
         return tableHTML;
     }
-
+    
+    // Process lists (using patterns similar to marked.js)
+    function processLists(html) {
+        // Define list regex patterns
+        const listItemRegex = /^( *)(?:[*+-]|\d+\.) +([^\n]*(?:\n(?!\1(?:[*+-]|\d+\.) )[^\n]*)*)(?:\n+|$)/gm;
+        const bulletListStart = '<ul>\n';
+        const bulletListEnd = '</ul>\n';
+        const orderedListStart = '<ol>\n';
+        const orderedListEnd = '</ol>\n';
+        
+        // Replace list items with HTML, tracking indentation
+        const listStack = [];
+        
+        html = html.replace(listItemRegex, function(match, indent, text) {
+            const isOrdered = match.match(/^\s*\d+\./);
+            const listTag = isOrdered ? 'ol' : 'ul';
+            const indentLevel = indent.length;
+            let result = '';
+            
+            // Close lists if needed
+            while (listStack.length > 0 && listStack[listStack.length - 1].indent > indentLevel) {
+                const item = listStack.pop();
+                result += item.type === 'ol' ? orderedListEnd : bulletListEnd;
+            }
+            
+            // Start new list if needed
+            if (listStack.length === 0 || listStack[listStack.length - 1].indent < indentLevel) {
+                result += isOrdered ? orderedListStart : bulletListStart;
+                listStack.push({ type: listTag, indent: indentLevel });
+            } 
+            // Close current list item if same level
+            else if (listStack[listStack.length - 1].indent === indentLevel) {
+                result += '</li>\n';
+            }
+            
+            // Process text content - apply inline formatting
+            text = text.trim()
+                .replace(/\n+$/, '') // Remove trailing newlines
+                .replace(/\n/g, '<br>'); // Convert internal newlines to <br>
+            
+            result += '<li>' + text;
+            return result;
+        });
+        
+        // Close any remaining open lists
+        while (listStack.length > 0) {
+            const item = listStack.pop();
+            html += '</li>\n';
+            html += item.type === 'ol' ? orderedListEnd : bulletListEnd;
+        }
+        
+        return html;
+    }
+    
     return `<p>${html}</p>`;
 };
     </script>
