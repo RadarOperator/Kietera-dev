@@ -395,11 +395,14 @@
             }
         }
 
-        // Improved markdown detection
+        // Improved markdown detection that ignores query strings
         function isMdFile(url) {
-            return url.toLowerCase().endsWith('.md') || 
-                   url.toLowerCase().endsWith('.markdown') ||
-                   url.toLowerCase().includes('/blob/') && url.toLowerCase().includes('.md');
+            // Remove query string if present
+            const urlWithoutQuery = url.split('?')[0];
+    
+            return urlWithoutQuery.toLowerCase().endsWith('.md') || 
+                   urlWithoutQuery.toLowerCase().endsWith('.markdown') ||
+                   urlWithoutQuery.toLowerCase().includes('/blob/') && urlWithoutQuery.toLowerCase().includes('.md');
         }
 
         async function fetchContent(url, isNavigation = true) {
@@ -542,37 +545,75 @@
                     processedLines.push(line);
                 }
             }
-            
             let html = processedLines.join('\n')
-                // Headers (# style)
-                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-                // Links
-                .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
-                    // Don't modify absolute URLs
-                    if (!url.startsWith('http')) {
-                        url = url.startsWith('/') ? url : '/' + url;
-                    }
-                    return `<a href="${url}">${text}</a>`;
-                })
-                // Bold
-                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                // Italic
-                .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-                // Code blocks
-                .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
-                // Inline code
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                // Blockquotes
-                .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
-                // Lists (basic)
-                .replace(/^\* (.+)/gm, '<ul><li>$1</li></ul>')
-                // Paragraphs
-                .replace(/\n\n/g, '</p><p>')
-                .replace(/^\s*(.+)/gm, '$1');
+    // Headers (# style)
+    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+    
+    // Line breaks - handle explicit line breaks (double space at end of line)
+    .replace(/(\S)  \n/g, '$1<br>\n')
+    
+    // Images with alt text and optional title
+    .replace(/!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g, '<img src="$2" alt="$1" title="$4"><br>')
+    
+    // Links
+    .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
+        // Don't modify absolute URLs
+        if (!url.startsWith('http')) {
+            url = url.startsWith('/') ? url : '/' + url;
+        }
+        return `<a href="${url}">${text}</a>`;
+    })
+    
+    // Ordered lists
+    .replace(/^(\s*)(\d+)\.[ \t]+(.+)$/gm, (match, indent, num, content) => {
+        // Look if this is the first item in an ordered list
+        const prevLine = match.match(/\n/) ? match.split('\n')[0] : '';
+        const isFirstItem = !prevLine.match(/^\s*\d+\.[ \t]+/);
+        const isLastItem = !match.match(/\n\s*\d+\.[ \t]+/);
+        
+        let result = '';
+        if (isFirstItem) result += `<ol>`;
+        result += `<li>${content}</li>`;
+        if (isLastItem) result += `</ol>`;
+        return result;
+    })
+    
+    // Unordered lists (both * and - markers)
+    .replace(/^(\s*)([\*\-])[ \t]+(.+)$/gm, (match, indent, marker, content) => {
+        // Look if this is the first item in an unordered list
+        const prevLine = match.match(/\n/) ? match.split('\n')[0] : '';
+        const isFirstItem = !prevLine.match(/^\s*[\*\-][ \t]+/);
+        const isLastItem = !match.match(/\n\s*[\*\-][ \t]+/);
+        
+        let result = '';
+        if (isFirstItem) result += `<ul>`;
+        result += `<li>${content}</li>`;
+        if (isLastItem) result += `</ul>`;
+        return result;
+    })
+    
+    // Bold
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    
+    // Italic
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    
+    // Code blocks
+    .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
+    
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    
+    // Blockquotes
+    .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
+    
+    // Paragraphs
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^\s*(.+)/gm, '$1');
 
-            return `<p>${html}</p>`;
+return `<p>${html}</p>`;
         };
     </script>
 </body>
