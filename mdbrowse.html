@@ -397,9 +397,9 @@
 
         // Improved markdown detection that ignores query strings
         function isMdFile(url) {
-            // Remove query string if present
-            const urlWithoutQuery = url.split('?')[0];
-    
+            // Remove query string and hash if present
+            const urlWithoutQuery = url.split(/[?#]/)[0];
+            
             return urlWithoutQuery.toLowerCase().endsWith('.md') || 
                    urlWithoutQuery.toLowerCase().endsWith('.markdown') ||
                    urlWithoutQuery.toLowerCase().includes('/blob/') && urlWithoutQuery.toLowerCase().includes('.md');
@@ -544,8 +544,7 @@
                 } else {
                     processedLines.push(line);
                 }
-            }
-            let html = processedLines.join('\n')
+            }let html = processedLines.join('\n')
     // Headers (# style)
     .replace(/^### (.*$)/gm, '<h3>$1</h3>')
     .replace(/^## (.*$)/gm, '<h2>$1</h2>')
@@ -555,43 +554,65 @@
     .replace(/(\S)  \n/g, '$1<br>\n')
     
     // Images with alt text and optional title
-    .replace(/!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g, '<img src="$2" alt="$1" title="$4"><br>')
+    .replace(/!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g, function(match, alt, src, _, title) {
+        // Handle relative URLs by prepending the base URL
+        let fullSrc = src;
+        if (!src.startsWith('http')) {
+            // Extract base URL from current page URL
+            const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
+            fullSrc = src.startsWith('/') ? window.location.origin + src : baseUrl + src;
+        }
+        
+        return `<a href="${fullSrc}"><img src="${fullSrc}" alt="${alt}" ${title ? `title="${title}"` : ''}></a>`;
+    })
     
     // Links
     .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
-        // Don't modify absolute URLs
+        // Handle relative URLs
         if (!url.startsWith('http')) {
-            url = url.startsWith('/') ? url : '/' + url;
+            const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
+            url = url.startsWith('/') ? window.location.origin + url : baseUrl + url;
         }
         return `<a href="${url}">${text}</a>`;
     })
     
-    // Ordered lists
-    .replace(/^(\s*)(\d+)\.[ \t]+(.+)$/gm, (match, indent, num, content) => {
-        // Look if this is the first item in an ordered list
-        const prevLine = match.match(/\n/) ? match.split('\n')[0] : '';
-        const isFirstItem = !prevLine.match(/^\s*\d+\.[ \t]+/);
-        const isLastItem = !match.match(/\n\s*\d+\.[ \t]+/);
+    // Process lists - this is more complex and should handle nesting
+    .replace(/^( *)(?:[*+-]|\d+\.) (.+)$/gm, function(match, indent, content) {
+        // Create an array to keep track of the current list state
+        if (typeof this.listStack === 'undefined') {
+            this.listStack = [];
+        }
         
-        let result = '';
-        if (isFirstItem) result += `<ol>`;
-        result += `<li>${content}</li>`;
-        if (isLastItem) result += `</ol>`;
-        return result;
-    })
-    
-    // Unordered lists (both * and - markers)
-    .replace(/^(\s*)([\*\-])[ \t]+(.+)$/gm, (match, indent, marker, content) => {
-        // Look if this is the first item in an unordered list
-        const prevLine = match.match(/\n/) ? match.split('\n')[0] : '';
-        const isFirstItem = !prevLine.match(/^\s*[\*\-][ \t]+/);
-        const isLastItem = !match.match(/\n\s*[\*\-][ \t]+/);
+        let indentLevel = indent.length;
+        let html = '';
         
-        let result = '';
-        if (isFirstItem) result += `<ul>`;
-        result += `<li>${content}</li>`;
-        if (isLastItem) result += `</ul>`;
-        return result;
+        // Check if we're starting a new list
+        if (this.listStack.length === 0 || indentLevel > this.listStack[this.listStack.length - 1].indent) {
+            // It's a new list or a nested list
+            const listType = match.match(/^\s*\d+\./) ? 'ol' : 'ul';
+            html += `<${listType}>`;
+            this.listStack.push({ type: listType, indent: indentLevel });
+        } 
+        // Check if we need to close lists due to dedent
+        else if (indentLevel < this.listStack[this.listStack.length - 1].indent) {
+            // Close all lists that are more indented than the current line
+            while (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent > indentLevel) {
+                html += `</li></${this.listStack.pop().type}>`;
+            }
+            // If we're at a different indentation level, we might need to close the previous item
+            if (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent === indentLevel) {
+                html += '</li>';
+            }
+        } 
+        // Same indent level, close previous list item
+        else if (indentLevel === this.listStack[this.listStack.length - 1].indent) {
+            html += '</li>';
+        }
+        
+        // Add the new list item
+        html += `<li>${content}`;
+        
+        return html;
     })
     
     // Bold
@@ -612,6 +633,16 @@
     // Paragraphs
     .replace(/\n\n/g, '</p><p>')
     .replace(/^\s*(.+)/gm, '$1');
+
+// Clean up any remaining open lists
+if (this.listStack && this.listStack.length > 0) {
+    let closingTags = '';
+    for (let i = this.listStack.length - 1; i >= 0; i--) {
+        closingTags += `</li></${this.listStack[i].type}>`;
+    }
+    html += closingTags;
+    this.listStack = [];
+}
 
 return `<p>${html}</p>`;
         };
