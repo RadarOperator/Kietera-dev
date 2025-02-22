@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Markdown Browser v26</title>
+    <title>Tilde Markdown Browser v27</title>
     <link rel="icon" type="image/png" href="/Kietera-dev/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/Kietera-dev/favicon.svg" />
     <link rel="shortcut icon" href="/Kietera-dev/favicon.ico" />
@@ -549,37 +549,49 @@ const parseMarkdown = (text) => {
     const lines = content.split('\n');
     const processedLines = [];
     
-    for (let i = 0; i < lines.length; i++) {
+    // First pass: Handle underline headers and detect tables
+    let i = 0;
+    while (i < lines.length) {
         const line = lines[i];
         const nextLine = lines[i + 1] || '';
         
         // Check for underline-style headers
         if (nextLine.match(/^=+$/)) {
             processedLines.push('# ' + line);
-            i++; // Skip the underline
-        } else if (nextLine.match(/^-+$/)) {
+            i += 2; // Skip the underline
+        } 
+        else if (nextLine.match(/^-+$/)) {
             processedLines.push('## ' + line);
-            i++; // Skip the underline
-        } else {
+            i += 2; // Skip the underline
+        }
+        // Check for tables - a line starting and ending with | followed by a separator line
+        else if (line.trim().startsWith('|') && line.trim().endsWith('|') && 
+                 nextLine.trim().startsWith('|') && nextLine.trim().endsWith('|') &&
+                 nextLine.replace(/[^-:|]/g, '').length === nextLine.trim().length - 2) {
+            
+            // We found a table - collect all the rows
+            const tableRows = [];
+            tableRows.push(line.trim());       // Header row
+            tableRows.push(nextLine.trim());   // Separator row
+            i += 2; // Move past header and separator
+            
+            // Collect data rows
+            while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+                tableRows.push(lines[i].trim());
+                i++;
+            }
+            
+            // Process table and add HTML to output
+            processedLines.push(renderTable(tableRows));
+        }
+        else {
             processedLines.push(line);
+            i++;
         }
     }
 
-    // Find and process tables first - using approach similar to marked
-    let processedContent = processedLines.join('\n');
-    const tableParts = [];
-    
-    // Regular expression for table from marked.js
-    const tableRegex = /^ *([^|\n ].*\|.*)\n *\|?([ :]*[-:]+[ :]*\|[ :]*)+[-:]+[ :]*\n((?:.*\|.*(?:\n|$))*)\n*/gm;
-    
-    // Replace tables with placeholders so they don't get affected by other processing
-    processedContent = processedContent.replace(tableRegex, function(match, header, align, content) {
-        tableParts.push(renderTable(header, align, content));
-        return `{{TABLE_${tableParts.length - 1}_PLACEHOLDER}}`;
-    });
-
-    // Process other markdown elements
-    let html = processedContent
+    // Process the rest of markdown elements
+    let html = processedLines.join('\n')
         // Headers (# style)
         .replace(/^### (.*$)/gm, '<h3>$1</h3>')
         .replace(/^## (.*$)/gm, '<h2>$1</h2>')
@@ -610,90 +622,52 @@ const parseMarkdown = (text) => {
         .replace(/\n\n/g, '</p><p>')
         .replace(/^\s*(.+)/gm, '$1');
 
-    // Replace table placeholders with actual table HTML
-    html = html.replace(/{{TABLE_(\d+)_PLACEHOLDER}}/g, function(match, index) {
-        return tableParts[parseInt(index)];
-    });
-
-    // Function to render tables - highly based on marked's approach
-    function renderTable(header, align, content) {
-        // Split cells by pipe character
-        function splitCells(tableRow) {
-            // ensure that every cell-delimiting pipe has a space
-            // before it to distinguish it from an escaped pipe
-            const row = tableRow.replace(/\|/g, (match, offset, str) => {
-                let escaped = false;
-                let curr = offset;
-                while (--curr >= 0 && str[curr] === '\\') {
-                    escaped = !escaped;
-                }
-                if (escaped) {
-                    // odd number of slashes means | is escaped
-                    // so we leave it alone
-                    return '|';
-                } else {
-                    // add space before unescaped |
-                    return ' |';
-                }
-            });
-            const cells = row.split(/ *\| */);
-            
-            // First/last cell in a row cannot be empty if it has no leading/trailing pipe
-            if (!cells[0].trim()) {
-                cells.shift();
-            }
-            if (cells.length > 0 && !cells[cells.length - 1].trim()) {
-                cells.pop();
-            }
-            
-            return cells;
-        }
-
-        // Parse header row
-        const headerCells = splitCells(header.trim());
+    // Function to render tables
+    function renderTable(rows) {
+        if (rows.length < 3) return rows.join('\n'); // Not enough rows for a valid table
         
-        // Parse alignment row
-        const alignRow = align.trim().split(/ *\| */);
-        if (!alignRow[0].trim()) {
-            alignRow.shift();
-        }
-        if (alignRow.length > 0 && !alignRow[alignRow.length - 1].trim()) {
-            alignRow.pop();
-        }
+        const headerRow = rows[0];
+        const separatorRow = rows[1];
+        const dataRows = rows.slice(2);
         
-        // Determine alignment for each column
-        const alignments = alignRow.map(cell => {
-            if (cell.match(/^ *-+: *$/)) {
-                return 'right';
-            } else if (cell.match(/^ *:-+: *$/)) {
-                return 'center';
-            } else if (cell.match(/^ *:-+ *$/)) {
-                return 'left';
-            } else {
+        // Parse header cells
+        const headers = headerRow.split('|')
+            .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+            .map(cell => cell.trim());
+        
+        // Parse alignment from separator row
+        const alignments = separatorRow.split('|')
+            .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+            .map(cell => {
+                cell = cell.trim();
+                if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+                else if (cell.endsWith(':')) return 'right';
+                else if (cell.startsWith(':')) return 'left';
                 return '';
-            }
-        });
+            });
         
-        // Start building the table HTML
+        // Start building table HTML
         let tableHTML = '<table>\n<thead>\n<tr>\n';
         
         // Add header cells
-        headerCells.forEach((cell, i) => {
-            const align = alignments[i] || '';
-            tableHTML += `<th${align ? ` align="${align}"` : ''}>${cell}</th>\n`;
+        headers.forEach((header, i) => {
+            const align = alignments[i] ? ` align="${alignments[i]}"` : '';
+            tableHTML += `<th${align}>${header}</th>\n`;
         });
         
         tableHTML += '</tr>\n</thead>\n<tbody>\n';
         
-        // Parse and add data rows
-        const contentRows = content.trim().split('\n');
-        contentRows.forEach(row => {
-            const cells = splitCells(row);
+        // Add data rows
+        dataRows.forEach(row => {
+            const cells = row.split('|')
+                .filter((cell, i, arr) => i > 0 && i < arr.length - 1)
+                .map(cell => cell.trim());
+            
             tableHTML += '<tr>\n';
             
             cells.forEach((cell, i) => {
-                const align = alignments[i] || '';
-                tableHTML += `<td${align ? ` align="${align}"` : ''}>${cell}</td>\n`;
+                const align = alignments[i] ? ` align="${alignments[i]}"` : '';
+                tableHTML += `<td${align}>${cell}</td>\n`;
             });
             
             tableHTML += '</tr>\n';
