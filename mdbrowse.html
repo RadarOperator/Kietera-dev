@@ -539,10 +539,11 @@ const parseMarkdown = (text) => {
     const contentStart = text.indexOf("Markdown Content:");
     const content = contentStart !== -1 ? text.slice(contentStart + 17) : text;
     
-    // Split into lines for underline header processing
+    // Split into lines for underline header processing and other block-level elements
     const lines = content.split('\n');
     const processedLines = [];
     
+    // First pass: Process tables and other block elements
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const nextLine = lines[i + 1] || '';
@@ -554,77 +555,42 @@ const parseMarkdown = (text) => {
         } else if (nextLine.match(/^-+$/)) {
             processedLines.push('## ' + line);
             i++; // Skip the underline
-        } else {
-            processedLines.push(line);
-        }
-    }
-    
-    // Table parsing - extract tables first
-    const tableExtractedLines = [];
-    let i = 0;
-    
-    while (i < processedLines.length) {
-        const line = processedLines[i].trim();
-        const nextLine = (i + 1 < processedLines.length) ? processedLines[i + 1].trim() : '';
-        
-        // Check if this is the start of a table (first row followed by a separator row)
-        if (line.startsWith('|') && line.endsWith('|') && 
-            nextLine.startsWith('|') && nextLine.endsWith('|') && 
-            nextLine.replace(/[^-|]/g, '') === nextLine) {
-            
-            // We found a table with a header
+        } 
+        // Check for tables
+        else if (line.trim().startsWith('|') && line.trim().endsWith('|') && 
+                nextLine.trim().startsWith('|') && nextLine.trim().endsWith('|') && 
+                nextLine.replace(/[^-|:]/g, '') === nextLine.trim()) {
+            // We found a table
             const tableLines = [];
-            const headerRow = line;
-            const separatorRow = nextLine;
+            tableLines.push(line.trim());   // Header row
+            tableLines.push(nextLine.trim()); // Separator row
+            i += 2; // Skip header and separator rows
             
-            // Add the header row
-            tableLines.push(headerRow);
-            
-            // Skip the separator line since we've already identified it
-            i += 2;
-            
-            // Collect all subsequent table rows
-            while (i < processedLines.length) {
-                const rowLine = processedLines[i].trim();
-                if (rowLine.startsWith('|') && rowLine.endsWith('|') && 
-                    rowLine !== separatorRow) {
+            // Collect content rows
+            while (i < lines.length) {
+                const rowLine = lines[i].trim();
+                if (rowLine.startsWith('|') && rowLine.endsWith('|')) {
                     tableLines.push(rowLine);
                     i++;
                 } else {
                     break;
                 }
             }
+            i--; // Adjust for the main loop increment
             
-            // Convert the table lines to HTML
-            tableExtractedLines.push(parseTableToHTML(tableLines, headerRow, separatorRow));
+            // Replace with table HTML
+            processedLines.push(parseTableToHTML(tableLines));
         } else {
-            tableExtractedLines.push(line);
-            i++;
+            processedLines.push(line);
         }
     }
     
-    let html = tableExtractedLines.join('\n')
+    // Second pass: Regular markdown processing
+    let html = processedLines.join('\n')
         // Headers (# style)
         .replace(/^### (.*$)/gm, '<h3>$1</h3>')
         .replace(/^## (.*$)/gm, '<h2>$1</h2>')
         .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-        
-        // Line breaks - handle explicit line breaks (double space at end of line)
-        .replace(/(\S)  \n/g, '$1<br>\n')
-        
-        // Images with alt text and optional title
-        .replace(/!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g, function(match, alt, src, _, title) {
-            // Handle relative URLs by prepending the base URL
-            let fullSrc = src;
-            if (!src.startsWith('http')) {
-                // Extract base URL from current page URL
-                const baseUrl = window.location.href.split('/').slice(0, -1).join('/') + '/';
-                fullSrc = src.startsWith('/') ? window.location.origin + src : baseUrl + src;
-            }
-            
-            return `<a href="${fullSrc}"><img src="${fullSrc}" alt="${alt}" ${title ? `title="${title}"` : ''}></a>`;
-        })
-        
         // Links
         .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, text, url) => {
             // Handle relative URLs
@@ -634,135 +600,139 @@ const parseMarkdown = (text) => {
             }
             return `<a href="${url}">${text}</a>`;
         })
-        
-        // Process lists - this is more complex and should handle nesting
-        .replace(/^( *)(?:[*+-]|\d+\.) (.+)$/gm, function(match, indent, content) {
-            // Create an array to keep track of the current list state
-            if (typeof this.listStack === 'undefined') {
-                this.listStack = [];
-            }
-            
-            let indentLevel = indent.length;
-            let html = '';
-            
-            // Check if we're starting a new list
-            if (this.listStack.length === 0 || indentLevel > this.listStack[this.listStack.length - 1].indent) {
-                // It's a new list or a nested list
-                const listType = match.match(/^\s*\d+\./) ? 'ol' : 'ul';
-                html += `<${listType}>`;
-                this.listStack.push({ type: listType, indent: indentLevel });
-            } 
-            // Check if we need to close lists due to dedent
-            else if (indentLevel < this.listStack[this.listStack.length - 1].indent) {
-                // Close all lists that are more indented than the current line
-                while (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent > indentLevel) {
-                    html += `</li></${this.listStack.pop().type}>`;
-                }
-                // If we're at a different indentation level, we might need to close the previous item
-                if (this.listStack.length > 0 && this.listStack[this.listStack.length - 1].indent === indentLevel) {
-                    html += '</li>';
-                }
-            } 
-            // Same indent level, close previous list item
-            else if (indentLevel === this.listStack[this.listStack.length - 1].indent) {
-                html += '</li>';
-            }
-            
-            // Add the new list item
-            html += `<li>${content}`;
-            
-            return html;
-        })
-        
         // Bold
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        
         // Italic
         .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        
         // Code blocks
         .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
-        
         // Inline code
         .replace(/`([^`]+)`/g, '<code>$1</code>')
-        
         // Blockquotes
         .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
-        
+        // Nested lists (unordered)
+        .replace(/^( *)[\*\+\-] (.*?)$/gm, function(match, indent, content) {
+            const indentLevel = indent.length;
+            return `<li data-indent="${indentLevel}">${content}</li>`;
+        })
+        // Nested lists (ordered)
+        .replace(/^( *)\d+\. (.*?)$/gm, function(match, indent, content) {
+            const indentLevel = indent.length;
+            return `<li data-indent="${indentLevel}" data-ordered="true">${content}</li>`;
+        })
+        // Process list items to create proper nested lists
+        .replace(/(<li[^>]*>.*?<\/li>)+/g, function(match) {
+            const items = match.match(/<li[^>]*>.*?<\/li>/g);
+            if (!items) return match;
+            
+            const processListItems = (items, startIndex, baseIndent) => {
+                let html = '';
+                let i = startIndex;
+                const isOrdered = items[i].includes('data-ordered="true"');
+                html += isOrdered ? '<ol>' : '<ul>';
+                
+                while (i < items.length) {
+                    const item = items[i];
+                    const indentMatch = item.match(/data-indent="(\d+)"/);
+                    const indent = indentMatch ? parseInt(indentMatch[1]) : 0;
+                    
+                    if (indent > baseIndent) {
+                        // Process nested list
+                        const [nestedHtml, nextIndex] = processListItems(items, i, indent);
+                        // Append nested list to previous item
+                        html = html.substring(0, html.lastIndexOf('</li>')) + nestedHtml + '</li>';
+                        i = nextIndex;
+                    } else if (indent === baseIndent) {
+                        // Current level item
+                        html += item;
+                        i++;
+                    } else {
+                        // Less indentation - end of this list
+                        break;
+                    }
+                }
+                
+                html += isOrdered ? '</ol>' : '</ul>';
+                return [html, i];
+            };
+            
+            const [html, _] = processListItems(items, 0, 0);
+            return html;
+        })
+        // Clean up list item attributes
+        .replace(/<li[^>]*data-indent="\d+"[^>]*>/g, '<li>')
+        .replace(/<li[^>]*data-ordered="true"[^>]*>/g, '<li>')
         // Paragraphs
         .replace(/\n\n/g, '</p><p>')
         .replace(/^\s*(.+)/gm, '$1');
 
-    // Clean up any remaining open lists
-    if (this.listStack && this.listStack.length > 0) {
-        let closingTags = '';
-        for (let i = this.listStack.length - 1; i >= 0; i--) {
-            closingTags += `</li></${this.listStack[i].type}>`;
-        }
-        html += closingTags;
-        this.listStack = [];
+    // Parse table function
+    function parseTableToHTML(tableLines) {
+        const headerRow = tableLines[0];
+        const separatorRow = tableLines[1];
+        const contentRows = tableLines.slice(2);
+        
+        // Parse headers
+        const headers = headerRow
+            .split('|')
+            .filter((cell, index, array) => index > 0 && index < array.length - 1)
+            .map(cell => cell.trim());
+            
+        // Parse alignment from separator row
+        const alignments = separatorRow
+            .split('|')
+            .filter((cell, index, array) => index > 0 && index < array.length - 1)
+            .map(cell => {
+                cell = cell.trim();
+                if (cell.startsWith(':') && cell.endsWith(':')) {
+                    return 'center';
+                } else if (cell.endsWith(':')) {
+                    return 'right';
+                }
+                return 'left';
+            });
+            
+        // Build HTML table
+        let tableHTML = '<table>\n<thead>\n<tr>\n';
+        
+        // Add header cells
+        headers.forEach((header, index) => {
+            const align = alignments[index] || '';
+            tableHTML += `<th${align ? ` align="${align}"` : ''}>${header}</th>\n`;
+        });
+        
+        tableHTML += '</tr>\n</thead>\n<tbody>\n';
+        
+        // Add content rows
+        contentRows.forEach(row => {
+            const cells = row
+                .split('|')
+                .filter((cell, index, array) => index > 0 && index < array.length - 1)
+                .map(cell => cell.trim());
+                
+            tableHTML += '<tr>\n';
+            
+            cells.forEach((cell, index) => {
+                const align = alignments[index] || '';
+                // Process markdown inside cells
+                const cellContent = cell
+                    .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
+                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                    .replace(/`([^`]+)`/g, '<code>$1</code>');
+                    
+                tableHTML += `<td${align ? ` align="${align}"` : ''}>${cellContent}</td>\n`;
+            });
+            
+            tableHTML += '</tr>\n';
+        });
+        
+        tableHTML += '</tbody>\n</table>';
+        return tableHTML;
     }
 
     return `<p>${html}</p>`;
 };
-
-// Function to parse table rows into HTML
-function parseTableToHTML(rows, headerRow, separatorRow) {
-    let tableHTML = '<table>';
-    
-    // Process the header row
-    if (rows[0] === headerRow) {
-        const headerCells = headerRow
-            .split('|')
-            .slice(1, -1) // Remove first and last empty parts
-            .map(cell => cell.trim());
-        
-        tableHTML += '<thead><tr>';
-        headerCells.forEach(cell => {
-            // Parse any markdown inside the table cell (e.g., links, bold)
-            tableHTML += `<th>${parseCellContent(cell)}</th>`;
-        });
-        tableHTML += '</tr></thead><tbody>';
-    }
-    
-    // Process content rows (skip header and separator)
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (row === headerRow || row === separatorRow) continue;
-        
-        const cells = row
-            .split('|')
-            .slice(1, -1) // Remove first and last empty parts
-            .map(cell => cell.trim());
-        
-        tableHTML += '<tr>';
-        cells.forEach(cell => {
-            // Parse any markdown inside the table cell
-            tableHTML += `<td>${parseCellContent(cell)}</td>`;
-        });
-        tableHTML += '</tr>';
-    }
-    
-    tableHTML += '</tbody></table>';
-    return tableHTML;
-}
-
-// Function to parse the markdown content inside table cells
-function parseCellContent(content) {
-    return content
-        // Links in Markdown reference style [text][id]
-        .replace(/\[([^\]]+)\]\[([^\]]+)\]/g, (match, text, id) => {
-            return `<a href="#" data-ref="${id}">${text}</a>`;
-        })
-        // Standard markdown links [text](url)
-        .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>')
-        // Bold
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        // Italic
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        // Inline code
-        .replace(/`([^`]+)`/g, '<code>$1</code>');
-}
     </script>
 </body>
 </html>
