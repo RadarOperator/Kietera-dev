@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Tilde Markdown Browser v27</title>
+    <title>Tilde Markdown Browser v28</title>
     <link rel="icon" type="image/png" href="/Kietera-dev/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/Kietera-dev/favicon.svg" />
     <link rel="shortcut icon" href="/Kietera-dev/favicon.ico" />
@@ -609,8 +609,8 @@ const parseMarkdown = (text) => {
         // Blockquotes
         .replace(/^> (.+)/gm, '<blockquote>$1</blockquote>')
         // Lists
-        .replace(/^( *)[\*\+\-] (.+)/gm, function(match, indent, content) {
-            return indent + '<li>' + content + '</li>';
+        .replace(/^( *)[\*\+\-] (.+)(?!<\/table>)/gm, function(match, indent, content) {
+        return indent + '<li>' + content + '</li>';
         })
         .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
         // Ordered lists
@@ -621,7 +621,8 @@ const parseMarkdown = (text) => {
         // Paragraphs
         .replace(/\n\n/g, '</p><p>')
         .replace(/^\s*(.+)/gm, '$1');
-
+        // Images
+        .replace(/!\[([^\]]+)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1">')
     // Function to render tables
     function renderTable(rows) {
         if (rows.length < 3) return rows.join('\n'); // Not enough rows for a valid table
