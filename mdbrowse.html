@@ -2,7 +2,13 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Markdown Browser v25</title>
+    <title>Markdown Browser v26</title>
+    <link rel="icon" type="image/png" href="/Kietera-dev/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/Kietera-dev/favicon.svg" />
+    <link rel="shortcut icon" href="/Kietera-dev/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/Kietera-dev/apple-touch-icon.png" />
+    <link rel="manifest" href="/Kietera-dev/site.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="~" />
     <style>
         body {
             max-width: 800px;
@@ -560,20 +566,20 @@ const parseMarkdown = (text) => {
     }
 
     // Find and process tables first - using approach similar to marked
-    let text = processedLines.join('\n');
+    let processedContent = processedLines.join('\n');
     const tableParts = [];
     
     // Regular expression for table from marked.js
     const tableRegex = /^ *([^|\n ].*\|.*)\n *\|?([ :]*[-:]+[ :]*\|[ :]*)+[-:]+[ :]*\n((?:.*\|.*(?:\n|$))*)\n*/gm;
     
     // Replace tables with placeholders so they don't get affected by other processing
-    text = text.replace(tableRegex, function(match, header, align, content) {
+    processedContent = processedContent.replace(tableRegex, function(match, header, align, content) {
         tableParts.push(renderTable(header, align, content));
         return `{{TABLE_${tableParts.length - 1}_PLACEHOLDER}}`;
     });
 
     // Process other markdown elements
-    let html = text
+    let html = processedContent
         // Headers (# style)
         .replace(/^### (.*$)/gm, '<h3>$1</h3>')
         .replace(/^## (.*$)/gm, '<h2>$1</h2>')
