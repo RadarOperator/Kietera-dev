@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Repair Puzzle</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #0a0a0a;
+            color: white;
+        }
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .button {
+            padding: 12px 24px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .button:hover {
+            background-color: rgba(40, 40, 40, 0.8);
+            transform: scale(1.05);
+        }
+        #manual-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            height: 400px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            overflow-y: auto;
+            transform: translateX(350px);
+            transition: transform 0.5s;
+            z-index: 100;
+        }
+        #manual-container.visible {
+            transform: translateX(0);
+        }
+        #manual-title {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 1px solid #4CAF50;
+            padding-bottom: 5px;
+        }
+        #manual-content {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .manual-section {
+            margin-bottom: 15px;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #88ff8a;
+        }
+        #tracking-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            font-size: 14px;
+            z-index: 100;
+        }
+        #progress-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            text-align: center;
+            z-index: 100;
+        }
+        #progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #333;
+            border-radius: 5px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        #progress {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        #results {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 500px;
+            background-color: rgba(0, 0, 0, 0.9);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 25px;
+            color: white;
+            text-align: center;
+            z-index: 200;
+            display: none;
+        }
+        #results h2 {
+            margin-top: 0;
+            color: #88ff8a;
+        }
+        .score-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .score-label {
+            flex: 1;
+            text-align: right;
+            padding-right: 10px;
+        }
+        .score-value {
+            flex: 1;
+            text-align: left;
+            padding-left: 10px;
+        }
+        .score-bar {
+            width: 200px;
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(to right, #4c6baf 0%, #4CAF50 100%);
+            width: 50%;
+        }
+        .score-marker {
+            position: absolute;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background-color: white;
+            left: 50%;
+        }
+        #job-matches {
+            margin-top: 20px;
+            text-align: left;
+        }
+        .job-match {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        #restart-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #restart-button:hover {
+            background-color: #45a049;
+        }
+        .component {
+            width: 80px;
+            height: 80px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            background-color: #333;
+            position: relative;
+            border: 2px solid #555;
+        }
+        .component:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        .component.active {
+            border-color: #4CAF50;
+            background-color: #2d5e2f;
+        }
+        #puzzle-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 70vh;
+            padding: 20px;
+        }
+        .component-row {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #core {
+            width: 120px;
+            height: 120px;
+            background-color: #ff3333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 30px 0;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            transition: all 0.5s ease;
+        }
+        .component-label {
+            position: absolute;
+            bottom: -25px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        #system-status {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+            background-color: #ff3333;
+        }
+        .status-indicator.fixed {
+            background-color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="ui-container">
+            <button id="toggle-manual" class="button">Show Manual</button>
+            <button id="reset-components" class="button">Reset Components</button>
+            <button id="analyze-system" class="button">Analyze System</button>
+        </div>
+
+        <div id="manual-container">
+            <div id="manual-title">System Repair Manual</div>
+            <div id="manual-content">
+                <div class="manual-section">
+                    <div class="section-title">1. Power Distribution</div>
+                    <p>Activate power nodes in sequential order (A, then B, then C). All three must be active.</p>
+                </div>
+                <div class="manual-section">
+                    <div class="section-title">2. Data Processing</div>
+                    <p>Arrange data cubes in correct color order: Blue, Red, Green, Yellow.</p>
+                </div>
+                <div class="manual-section">
+                    <div class="section-title">3. Cooling System</div>
+                    <p>Adjust cooling rods to the optimal position (60° rotation).</p>
+                </div>
+                <div class="manual-section">
+                    <div class="section-title">4. Signal Calibration</div>
+                    <p>Activate the signal node when all other systems are operational.</p>
+                </div>
+                <div class="manual-section">
+                    <div class="section-title">5. Final Verification</div>
+                    <p>When all systems are operational, the central core should turn green.</p>
+                </div>
+                <div class="manual-section">
+                    <div class="section-title">Troubleshooting</div>
+                    <p>- Red core: Multiple systems failing<br>
+                    - Orange core: Three systems failing<br>
+                    - Yellow core: Two systems failing<br>
+                    - Yellow-green core: One system failing<br>
+                    - Green core: All systems operational</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="tracking-info">
+            <div>Manual consulted: <span id="manual-count">0</span> times</div>
+            <div>Experimental actions: <span id="experiment-count">0</span></div>
+            <div>Systematic steps: <span id="systematic-count">0</span></div>
+            <div>Approach: <span id="approach-score">Neutral</span></div>
+        </div>
+
+        <div id="progress-container">
+            <div>System Repair Progress</div>
+            <div id="progress-bar">
+                <div id="progress"></div>
+            </div>
+        </div>
+
+        <div id="puzzle-container">
+            <div id="system-status">
+                <div>System Status:</div>
+                <div>
+                    <span class="status-indicator" id="power-status"></span> Power
+                    <span class="status-indicator" id="data-status"></span> Data
+                    <span class="status-indicator" id="cooling-status"></span> Cooling
+                    <span class="status-indicator" id="signal-status"></span> Signal
+                </div>
+            </div>
+            
+            <div class="component-row">
+                <div id="power-node-a" class="component" onclick="togglePowerNode(0)">
+                    Power A
+                    <div class="component-label">Power Node A</div>
+                </div>
+                <div id="power-node-b" class="component" onclick="togglePowerNode(1)">
+                    Power B
+                    <div class="component-label">Power Node B</div>
+                </div>
+                <div id="power-node-c" class="component" onclick="togglePowerNode(2)">
+                    Power C
+                    <div class="component-label">Power Node C</div>
+                </div>
+            </div>
+            
+            <div id="core" onclick="pulseCore()">CORE</div>
+            
+            <div class="component-row">
+                <div id="data-cube-0" class="component" onclick="rotateCube(0)" style="background-color: #4287f5;">
+                    Cube 1
+                    <div class="component-label">Data Cube (Blue)</div>
+                </div>
+                <div id="data-cube-1" class="component" onclick="rotateCube(1)" style="background-color: #f54242;">
+                    Cube 2
+                    <div class="component-label">Data Cube (Red)</div>
+                </div>
+                <div id="data-cube-2" class="component" onclick="rotateCube(2)" style="background-color: #42f554;">
+                    Cube 3
+                    <div class="component-label">Data Cube (Green)</div>
+                </div>
+                <div id="data-cube-3" class="component" onclick="rotateCube(3)" style="background-color: #f5e042;">
+                    Cube 4
+                    <div class="component-label">Data Cube (Yellow)</div>
+                </div>
+            </div>
+            
+            <div class="component-row">
+                <div id="cooling-rod-0" class="component" onclick="adjustCoolingRod(0)">
+                    Rod 1: 0°
+                    <div class="component-label">Cooling Rod 1</div>
+                </div>
+                <div id="cooling-rod-1" class="component" onclick="adjustCoolingRod(1)">
+                    Rod 2: 0°
+                    <div class="component-label">Cooling Rod 2</div>
+                </div>
+                <div id="signal-node-0" class="component" onclick="adjustSignalNode(0)">
+                    Signal
+                    <div class="component-label">Signal Node</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="results">
+            <h2>Analysis Complete</h2>
+            <p>Based on your problem-solving approach, we've analyzed your tendencies:</p>
+            
+            <div class="score-container">
+                <div class="score-label">Systematic</div>
+                <div class="score-bar">
+                    <div class="score-fill" id="approach-fill"></div>
+                    <div class="score-marker"></div>
+                </div>
+                <div class="score-value">Flexible</div>
+            </div>
+            
+            <p>Your score suggests you tend to approach problems with a <span id="approach-text">balanced</span> mindset.</p>
+            
+            <div id="job-matches">
+                <h3>Potential Job Matches:</h3>
+                <div id="job-matches-content"></div>
+            </div>
+            
+            <button id="restart-button">Try Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Tracking variables for behavior analysis
+        let manualConsultCount = 0;
+        let experimentActionCount = 0;
+        let systematicStepCount = 0;
+        let currentStep = 0;
+        let systematicApproach = 0; // -1 to 1 (flexible to systematic)
+        
+        // Track if manual is visible
+        let manualVisible = false;
+        
+        // Component states
+        const powerNodes = [
+            { active: false, id: "power-node-a" },
+            { active: false, id: "power-node-b" },
+            { active: false, id: "power-node-c" }
+        ];
+        
+        const dataCubes = [
+            { correctPosition: 0, currentPosition: 0, id: "data-cube-0" },
+            { correctPosition: 1, currentPosition: 1, id: "data-cube-1" },
+            { correctPosition: 2, currentPosition: 2, id: "data-cube-2" },
+            { correctPosition: 3, currentPosition: 3, id: "data-cube-3" }
+        ];
+        
+        const coolingRods = [
+            { currentRotation: 0, correctRotation: 60, id: "cooling-rod-0" },
+            { currentRotation: 0, correctRotation: 60, id: "cooling-rod-1" }
+        ];
+        
+        const signalNodes = [
+            { active: false, id: "signal-node-0" }
+        ];
+        
+        // Systems to fix
+        const systems = [
+            { name: "Power Distribution", fixed: false, manualSection: 1, statusId: "power-status" },
+            { name: "Data Processing", fixed: false, manualSection: 2, statusId: "data-status" },
+            { name: "Cooling System", fixed: false, manualSection: 3, statusId: "cooling-status" },
+            { name: "Signal Calibration", fixed: false, manualSection: 4, statusId: "signal-status" }
+        ];
+        
+        // UI event listeners
+        document.getElementById('toggle-manual').addEventListener('click', () => {
+            const manualContainer = document.getElementById('manual-container');
+            manualVisible = !manualVisible;
+            
+            if (manualVisible) {
+                manualContainer.classList.add('visible');
+                document.getElementById('toggle-manual').textContent = 'Hide Manual';
+                manualConsultCount++;
+                document.getElementById('manual-count').textContent = manualConsultCount;
+                systematicApproach += 0.1;
+                updateApproachScore();
+            } else {
+                manualContainer.classList.remove('visible');
+                document.getElementById('toggle-manual').textContent = 'Show Manual';
+            }
+        });
+        
+        document.getElementById('reset-components').addEventListener('click', () => {
+            resetComponents();
+            experimentActionCount++;
+            document.getElementById('experiment-count').textContent = experimentActionCount;
+            systematicApproach -= 0.1;
+            updateApproachScore();
+        });
+        
+        document.getElementById('analyze-system').addEventListener('click', () => {
+            analyzeSystem();
+            systematicStepCount++;
+            document.getElementById('systematic-count').textContent = systematicStepCount;
+            systematicApproach += 0.15;
+            updateApproachScore();
+        });
+        
+        document.getElementById('restart-button').addEventListener('click', () => {
+            document.getElementById('results').style.display = 'none';
+            resetSimulation();
+        });
+        
+        // Function to update approach score display
+        function updateApproachScore() {
+            // Clamp value between -1 and 1
+            systematicApproach = Math.max(-1, Math.min(1, systematicApproach));
+            
+            let approachText = "Balanced";
+            if (systematicApproach > 0.3) approachText = "Somewhat Systematic";
+            if (systematicApproach > 0.6) approachText = "Highly Systematic";
+            if (systematicApproach < -0.3) approachText = "Somewhat Flexible";
+            if (systematicApproach < -0.6) approachText = "Highly Flexible";
+            
+            document.getElementById('approach-score').textContent = approachText;
+        }
+        
+        // Function to toggle power node
+        function togglePowerNode(index) {
+            const node = powerNodes[index];
+            node.active = !node.active;
+            
+            // Update appearance
+            const element = document.getElementById(node.id);
+            if (node.active) {
+                element.classList.add('active');
+            } else {
+                element.classList.remove('active');
+            }
+            
+            // Check if all power nodes are active and in sequence
+            checkPowerSystem();
+            
+            // Record interaction
+            if (manualVisible && currentStep === 0) {
+                systematicStepCount++;
+                document.getElementById('systematic-count').textContent = systematicStepCount;
+                systematicApproach += 0.05;
+            } else {
+                experimentActionCount++;
+                document.getElementById('experiment-count').textContent = experimentActionCount;
+                systematicApproach -= 0.05;
+            }
+            updateApproachScore();
+            
+            updateProgress();
+        }
+        
+        // Function to rotate data cube (representing data alignment)
+        function rotateCube(index) {
+            const cube = dataCubes[index];
+            
+            // Swap cubes to simulate rotation/reordering
+            const nextIndex = (index + 1) % dataCubes.length;
+            
+            // Swap cube positions visually by swapping their order in the DOM
+            const element = document.getElementById(cube.id);
+            const nextElement = document.getElementById(dataCubes[nextIndex].id);
+            
+            const parent = element.parentNode;
+            const elementClone = element.cloneNode(true);
+            const nextElementClone = nextElement.cloneNode(true);
+            
+            // Update click handlers on the clones
+            elementClone.onclick = function() { rotateCube(nextIndex); };
+            nextElementClone.onclick = function() { rotateCube(index); };
+            
+            // Replace elements
+            parent.replaceChild(elementClone, nextElement);
+            parent.replaceChild(nextElementClone, element);
+            
+            // Update data model
+            const tempId = cube.id;
+            const tempPosition = cube.currentPosition;
+            
+            cube.id = dataCubes[nextIndex].id;
+            cube.currentPosition = dataCubes[nextIndex].currentPosition;
+            
+            dataCubes[nextIndex].id = tempId;
+            dataCubes[nextIndex].currentPosition = tempPosition;
+            
+            // Check if all data cubes are in correct position
+            checkDataSystem();
+            
+            // Record interaction
+            if (manualVisible && currentStep === 1) {
+                systematicStepCount++;
+                document.getElementById('systematic-count').textContent = systematicStepCount;
+                systematicApproach += 0.05;
+            } else {
+                experimentActionCount++;
+                document.getElementById('experiment-count').textContent = experimentActionCount;
+                systematicApproach -= 0.05;
+            }
+            updateApproachScore();
+            
+            updateProgress();
+        }
+        
+        // Function to adjust cooling rod
+        function adjustCoolingRod(index) {
+            const rod = coolingRods[index];
+            rod.currentRotation = (rod.currentRotation + 15) % 180;
+            
+            // Update appearance
+            const element = document.getElementById(rod.id);
+            element.textContent = `Rod ${index+1}: ${rod.currentRotation}°`;
+            
+            // Visual feedback on proximity to correct value
+            const difference = Math.abs(rod.currentRotation - rod.correctRotation);
+            if (difference <= 15) {
+                element.style.backgroundColor = '#2d5e2f';
+                element.style.borderColor = '#4CAF50';
+            } else if (difference <= 30) {
+                element.style.backgroundColor = '#5e572d';
+                element.style.borderColor = '#ccc440';
+            } else {
+                element.style.backgroundColor = '#333';
+                element.style.borderColor = '#555';
+            }
+            
+            // Check if cooling rods are properly aligned
+            checkCoolingSystem();
+            
+            // Record interaction
+            if (manualVisible && currentStep === 2) {
+                systematicStepCount++;
+                document.getElementById('systematic-count').textContent = systematicStepCount;
+                systematicApproach += 0.05;
+            } else {
+                experimentActionCount++;
+                document.getElementById('experiment-count').textContent = experimentActionCount;
+                systematicApproach -= 0.05;
+            }
+            updateApproachScore();
+            
+            updateProgress();
+        }
+        
+        // Function to adjust signal node
+        function adjustSignalNode(index) {
+            const signal = signalNodes[index];
+            signal.active = !signal.active;
+            
+            // Update appearance
+            const element = document.getElementById(signal.id);
+            if (signal.active) {
+                element.classList.add('active');
+            } else {
+                element.classList.remove('active');
+            }
+            
+            // Check if signal is calibrated
+            checkSignalSystem();
+            
+            // Record interaction
+            if (manualVisible && currentStep === 3) {
+                systematicStepCount++;
+                document.getElementById('systematic-count').textContent = systematicStepCount;
+                systematicApproach += 0.05;
+            } else {
+                experimentActionCount++;
+                document.getElementById('experiment-count').textContent = experimentActionCount;
+                systematicApproach -= 0.05;
+            }
+            updateApproachScore();
+            
+            updateProgress();
+        }
+        
+        // Function to pulse the core (visual feedback)
+        function pulseCore() {
+            const core = document.getElementById('core');
+            const originalScale = core.style.transform || '';
+            
+            // Pulse animation
+            core.style.transform = 'scale(1.2)';
+            setTimeout(() => {
+                core.style.transform = originalScale;
+            }, 300);
+            
+            // Record interaction
+            experimentActionCount++;
+            document.getElementById('experiment-count').textContent = experimentActionCount;
+        }
+        
+        // System checking functions
+        function checkPowerSystem() {
+            // Power needs to be in sequence A -> B -> C
+            const isFixed = powerNodes[0].active && powerNodes[1].active && powerNodes[2].active;
+            systems[0].fixed = isFixed;
+            
+            if (isFixed && currentStep === 0) {
+                currentStep = 1;
+            }
+            
+            updateStatusIndicators();
+            updateCoreState();
+        }
+        
+        function checkDataSystem() {
+            // Check if data cubes are in correct positions
+            let isFixed = true;
+            for (let i = 0; i < dataCubes.length; i++) {
+                if (dataCubes[i].currentPosition !== dataCubes[i].correctPosition) {
+                    isFixed = false;
+                    break;
+                }
+            }
+            
+            systems[1].fixed = isFixed;
+            
+            if (isFixed && currentStep === 1) {
+                currentStep = 2;
+            }
+            
+            updateStatusIndicators();
+            updateCoreState();
+        }
+        
+        function checkCoolingSystem() {
+            // Cooling rods need to be within 15 degrees of correct rotation
+            const tolerance = 15;
+            
+            const allAligned = coolingRods.every(rod => 
+                Math.abs(rod.currentRotation - rod.correctRotation) <= tolerance);
+            
+            systems[2].fixed = allAligned;
+            
+            if (allAligned && currentStep === 2) {
+                currentStep = 3;
+            }
+            
+            updateStatusIndicators();
+            updateCoreState();
+        }
+        
+        function checkSignalSystem() {
+            // Signal nodes need to be active and other systems fixed
+            const otherSystemsFixed = systems.slice(0, 3).every(sys => sys.fixed);
+            const allCalibrated = signalNodes.every(signal => signal.active);
+            
+            systems[3].fixed = otherSystemsFixed && allCalibrated;
+            
+            if (systems[3].fixed && currentStep === 3) {
+                currentStep = 4;
+                systemFixed();
+            }
+            
+            updateStatusIndicators();
+            updateCoreState();
+        }
+        
+        // Update status indicators
+        function updateStatusIndicators() {
+            systems.forEach(system => {
+                const indicator = document.getElementById(system.statusId);
+                if (system.fixed) {
+                    indicator.classList.add('fixed');
+                } else {
+                    indicator.classList.remove('fixed');
+                }
+            });
+        }
+        
+        // Update central core visual state
+        function updateCoreState() {
+            // Count fixed systems
+            const fixedCount = systems.filter(sys => sys.fixed).length;
+            const core = document.getElementById('core');
+            
+            // Update core appearance based on fixed count
+            if (fixedCount === 0) {
+                core.style.backgroundColor = '#ff3333'; // Red
+                core.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
+            } else if (fixedCount === 1) {
+                core.style.backgroundColor = '#ff6633'; // Orange
+                core.style.boxShadow = '0 0 20px rgba(255, 102, 0, 0.5)';
+            } else if (fixedCount === 2) {
+                core.style.backgroundColor = '#ffcc33'; // Yellow
+                core.style.boxShadow = '0 0 20px rgba(255, 204, 0, 0.5)';
+            } else if (fixedCount === 3) {
+                core.style.backgroundColor = '#ccff33'; // Yellow-green
+                core.style.boxShadow = '0 0 20px rgba(204, 255, 0, 0.5)';
+            } else if (fixedCount === 4) {
+                core.style.backgroundColor = '#4CAF50'; // Green
+                core.style.boxShadow = '0 0 20px rgba(76, 175, 80, 0.7)';
+            }
+        }
+        
+        // Reset components to initial state but keep behavioral tracking
+        function resetComponents() {
+            // Reset power nodes
+            powerNodes.forEach(node => {
+                node.active = false;
+                document.getElementById(node.id).classList.remove('active');
+            });
+            
+            // Reset data cubes (randomize positions)
+            for (let i = 0; i < dataCubes.length; i++) {
+                dataCubes[i].currentPosition = i;
+                // Visual reset will be handled by DOM refresh
+            }
+            
+            // Reset cooling rods
+            coolingRods.forEach((rod, index) => {
+                rod.currentRotation = Math.floor(Math.random() * 12) * 15; // Random multiple of 15°
+                const element = document.getElementById(rod.id);
+                element.textContent = `Rod ${index+1}: ${rod.currentRotation}°`;
+                element.style.backgroundColor = '#333';
+                element.style.borderColor = '#555';
+            });
+            
+            // Reset signal nodes
+            signalNodes.forEach(signal => {
+                signal.active = false;
+                document.getElementById(signal.id).classList.remove('active');
+            });
+            
+            // Reset systems
+            systems.forEach(system => {
+                system.fixed = false;
+            });
+            
+            // Reset current step
+            currentStep = 0;
+            
+            // Update status
+            updateStatusIndicators();
+            updateCoreState();
+            
+            // Update progress
+            updateProgress();
+        }
+        
+        // Full simulation reset (including behavioral tracking)
+        function resetSimulation() {
+            resetComponents();
+            
+            // Reset behavior tracking
+            manualConsultCount = 0;
+            experimentActionCount = 0;
+            systematicStepCount = 0;
+            systematicApproach = 0;
+            
+            document.getElementById('manual-count').textContent = manualConsultCount;
+            document.getElementById('experiment-count').textContent = experimentActionCount;
+            document.getElementById('systematic-count').textContent = systematicStepCount;
+            updateApproachScore();
+        }
+        
+        // Function to analyze the current system
+        function analyzeSystem() {
+            // Count fixed systems
+            const fixedCount = systems.filter(sys => sys.fixed).length;
+            const totalSystems = systems.length;
+            
+            // Flash the core to indicate analysis
+            const core = document.getElementById('core');
+            const originalColor = core.style.backgroundColor;
+            const originalShadow = core.style.boxShadow;
+            
+            core.style.backgroundColor = '#ffffff';
+            core.style.boxShadow = '0 0 30px rgba(255, 255, 255, 0.8)';
+            
+            setTimeout(() => {
+                core.style.backgroundColor = originalColor;
+                core.style.boxShadow = originalShadow;
+                
+                // Show any issues
+                let issueSystems = systems.filter(sys => !sys.fixed);
+                if (issueSystems.length > 0) {
+                    // Highlight the first unfixed system component
+                    highlightSystem(issueSystems[0]);
+                }
+            }, 500);
+        }
+        
+        // Function to highlight a system that needs fixing
+        function highlightSystem(system) {
+            // Visual indication for which system needs attention
+            let targetElements = [];
+            
+            if (system.name === "Power Distribution") {
+                targetElements = powerNodes.map(node => document.getElementById(node.id));
+            } else if (system.name === "Data Processing") {
+                targetElements = dataCubes.map(cube => document.getElementById(cube.id));
+            } else if (system.name === "Cooling System") {
+                targetElements = coolingRods.map(rod => document.getElementById(rod.id));
+            } else if (system.name === "Signal Calibration") {
+                targetElements = signalNodes.map(signal => document.getElementById(signal.id));
+            }
+            
+            // Store original styles
+            const originalStyles = targetElements.map(element => ({
+                backgroundColor: element.style.backgroundColor,
+                borderColor: element.style.borderColor
+            }));
+            
+            // Highlight color
+            targetElements.forEach(element => {
+                element.style.backgroundColor = '#ffffff';
+                element.style.borderColor = '#ffffff';
+            });
+            
+            // Reset after delay
+            setTimeout(() => {
+                targetElements.forEach((element, index) => {
+                    element.style.backgroundColor = originalStyles[index].backgroundColor;
+                    element.style.borderColor = originalStyles[index].borderColor;
+                });
+            }, 1000);
+        }
+        
+        // Update progress bar
+        function updateProgress() {
+            const fixedCount = systems.filter(sys => sys.fixed).length;
+            const totalSystems = systems.length;
+            const percentage = (fixedCount / totalSystems) * 100;
+            
+            document.getElementById('progress').style.width = percentage + '%';
+        }
+        
+        // System fully fixed
+        function systemFixed() {
+            // Celebratory animation for the core
+            const core = document.getElementById('core');
+            let pulseCount = 0;
+            const maxPulses = 5;
+            
+            function pulseAnimation() {
+                if (pulseCount >= maxPulses) {
+                    // Show results
+                    showResults();
+                    return;
+                }
+                
+                // Pulse animation
+                core.style.transform = 'scale(1.2)';
+                
+                // Random festive color
+                const hue = Math.floor(Math.random() * 360);
+                core.style.backgroundColor = `hsl(${hue}, 100%, 50%)`;
+                core.style.boxShadow = `0 0 30px hsl(${hue}, 100%, 30%)`;
+                
+                setTimeout(() => {
+                    core.style.transform = '';
+                    
+                    setTimeout(() => {
+                        pulseCount++;
+                        pulseAnimation();
+                    }, 100);
+                }, 200);
+            }
+            
+            pulseAnimation();
+        }
+        
+        // Show results screen
+        function showResults() {
+            const resultsElement = document.getElementById('results');
+            resultsElement.style.display = 'block';
+            
+            // Set final core appearance
+            const core = document.getElementById('core');
+            core.style.backgroundColor = '#4CAF50';
+            core.style.boxShadow = '0 0 20px rgba(76, 175, 80, 0.7)';
+            core.style.transform = '';
+            
+            // Clamp score between -1 and 1
+            systematicApproach = Math.max(-1, Math.min(1, systematicApproach));
+            
+            // Set the fill percentage (convert -1...1 to 0%...100%)
+            const fillPercentage = ((systematicApproach + 1) / 2) * 100;
+            document.getElementById('approach-fill').style.width = fillPercentage + '%';
+            
+            // Set the approach text
+            let approachText = "balanced";
+            let jobMatches = [];
+            
+            if (systematicApproach > 0.6) {
+                approachText = "highly systematic";
+                jobMatches = [
+                    "Quality Control Specialist",
+                    "Accountant/Auditor",
+                    "Compliance Officer",
+                    "Air Traffic Controller",
+                    "Medical Lab Technician"
+                ];
+            } else if (systematicApproach > 0.2) {
+                approachText = "somewhat systematic";
+                jobMatches = [
+                    "Engineer",
+                    "Software Developer",
+                    "Data Analyst",
+                    "Project Manager",
+                    "Medical Professional"
+                ];
+            } else if (systematicApproach < -0.6) {
+                approachText = "highly flexible/creative";
+                jobMatches = [
+                    "Graphic Designer",
+                    "Marketing Creative",
+                    "Entrepreneur",
+                    "Product Designer",
+                    "Innovation Consultant"
+                ];
+            } else if (systematicApproach < -0.2) {
+                approachText = "somewhat flexible";
+                jobMatches = [
+                    "Product Manager",
+                    "UX Designer",
+                    "Sales Representative",
+                    "Customer Success Manager",
+                    "General Management"
+                ];
+            } else {
+                approachText = "balanced";
+                jobMatches = [
+                    "Team Lead",
+                    "General Management",
+                    "Business Analyst",
+                    "Full-stack Developer",
+                    "Technical Writer"
+                ];
+            }
+            
+            document.getElementById('approach-text').textContent = approachText;
+            
+            // Populate job matches
+            const jobMatchesContent = document.getElementById('job-matches-content');
+            jobMatchesContent.innerHTML = '';
+            
+            jobMatches.forEach(job => {
+                const jobElement = document.createElement('div');
+                jobElement.className = 'job-match';
+                jobElement.textContent = job;
+                jobMatchesContent.appendChild(jobElement);
+            });
+        }
+        
+        // Initialize the system
+        resetSimulation();
